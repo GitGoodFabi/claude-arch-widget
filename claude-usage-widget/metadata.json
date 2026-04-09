@@ -1,0 +1,20 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "",
+                "Name": "Fabian Schott"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Shows Claude Pro session and weekly usage limits",
+        "Icon": "brain",
+        "Id": "com.github.fabian.claude-usage",
+        "License": "MIT",
+        "Name": "Claude Usage",
+        "Version": "1.0",
+        "Website": ""
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

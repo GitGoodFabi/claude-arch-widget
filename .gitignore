@@ -1,0 +1,10 @@
+# Sensitive data - never commit
+*.txt
+session*
+*cookie*
+*secret*
+*token*
+
+# KDE cache files
+*.qmlc
+*.jsc
