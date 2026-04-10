@@ -6,6 +6,7 @@ import org.kde.kirigami as Kirigami
 Kirigami.FormLayout {
     id: configPage
 
+    property alias cfg_colorTheme: themeCombo.currentValue
     property alias cfg_backgroundOpacity: opacitySlider.value
     property alias cfg_terminalApp: terminalField.text
     property alias cfg_timerEnabled: timerToggle.checked
@@ -14,6 +15,28 @@ Kirigami.FormLayout {
     property alias cfg_projectShortcutUrl: projectUrlField.text
     property alias cfg_minimalView: minimalToggle.checked
     property alias cfg_sidebarShortcuts: sidebarShortcutsToggle.checked
+
+    // ── Farbthema ─────────────────────────────────────────────────────────
+    PlasmaComponents.ComboBox {
+        id: themeCombo
+        Kirigami.FormData.label: i18n("Color theme:")
+        textRole: "label"
+        valueRole: "value"
+        model: [
+            { label: "Amber",         value: "amber"  },
+            { label: "Ocean",         value: "ocean"  },
+            { label: "Aurora",        value: "aurora" },
+            { label: "Violet",        value: "violet" },
+            { label: "Liquid Glass",  value: "glass"  }
+        ]
+        Component.onCompleted: {
+            for (var i = 0; i < model.length; i++) {
+                if (model[i].value === cfg_colorTheme) {
+                    currentIndex = i; break
+                }
+            }
+        }
+    }
 
     // ── Ansicht ───────────────────────────────────────────────────────────
     PlasmaComponents.CheckBox {

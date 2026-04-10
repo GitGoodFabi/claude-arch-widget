@@ -20,6 +20,45 @@ PlasmoidItem {
 
     readonly property bool onDesktop: Plasmoid.formFactor === PlasmaCore.Types.Planar
 
+    // ── Farbthemen ────────────────────────────────────────────────────────────
+    readonly property var theme: {
+        var key = Plasmoid.configuration.colorTheme || "amber"
+        var map = {
+            "amber": {
+                s: "#FF7300",              w: "#FFB347",
+                sT: "rgba(255,115,0,0.18)",  wT: "rgba(255,179,71,0.18)",
+                sDim: "rgba(255,115,0,0.65)",  wDim: "rgba(255,178,71,0.65)",
+                sLbl: "rgba(255,115,0,0.5)"
+            },
+            "ocean": {
+                s: "#3B9EFF",              w: "#93C5FD",
+                sT: "rgba(59,158,255,0.18)", wT: "rgba(147,197,253,0.18)",
+                sDim: "rgba(59,158,255,0.6)", wDim: "rgba(147,197,253,0.6)",
+                sLbl: "rgba(59,158,255,0.5)"
+            },
+            "aurora": {
+                s: "#00D4AA",              w: "#67E8F9",
+                sT: "rgba(0,212,170,0.18)",  wT: "rgba(103,232,249,0.18)",
+                sDim: "rgba(0,212,170,0.6)", wDim: "rgba(103,232,249,0.6)",
+                sLbl: "rgba(0,212,170,0.5)"
+            },
+            "violet": {
+                s: "#A855F7",              w: "#E879F9",
+                sT: "rgba(168,85,247,0.18)", wT: "rgba(232,121,249,0.18)",
+                sDim: "rgba(168,85,247,0.6)",wDim: "rgba(232,121,249,0.6)",
+                sLbl: "rgba(168,85,247,0.5)"
+            },
+            "glass": {
+                s: "rgba(210,235,255,0.92)", w: "rgba(255,255,255,0.78)",
+                sT: "rgba(210,235,255,0.13)", wT: "rgba(255,255,255,0.09)",
+                sDim: "rgba(210,235,255,0.55)", wDim: "rgba(255,255,255,0.45)",
+                sLbl: "rgba(210,235,255,0.45)"
+            }
+        }
+        return map[key] || map["amber"]
+    }
+    onThemeChanged: { compactCanvas.requestPaint(); ringCanvas.requestPaint() }
+
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
 
     preferredRepresentation: onDesktop ? fullRepresentation : compactRepresentation
@@ -80,10 +119,10 @@ PlasmoidItem {
                 ctx.clearRect(0, 0, width, height)
                 var cx = width / 2, cy = height / 2
                 var lw = Math.max(2, width * 0.08)
-                arc(ctx, cx, cy, width * 0.44, lw, 1.0,                  "rgba(255,179,71,0.18)")
-                arc(ctx, cx, cy, width * 0.44, lw, root.weeklyPct  / 100, "#FFB347")
-                arc(ctx, cx, cy, width * 0.33, lw, 1.0,                  "rgba(255,115,0,0.18)")
-                arc(ctx, cx, cy, width * 0.33, lw, root.sessionPct / 100, "#FF7300")
+                arc(ctx, cx, cy, width * 0.44, lw, 1.0,                   root.theme.wT)
+                arc(ctx, cx, cy, width * 0.44, lw, root.weeklyPct  / 100, root.theme.w)
+                arc(ctx, cx, cy, width * 0.33, lw, 1.0,                   root.theme.sT)
+                arc(ctx, cx, cy, width * 0.33, lw, root.sessionPct / 100, root.theme.s)
             }
             function arc(ctx, cx, cy, r, lw, frac, color) {
                 ctx.beginPath()
@@ -115,7 +154,7 @@ PlasmoidItem {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: root.loading ? "…" : root.errorMsg ? "!" : Math.round(root.sessionPct) + "%"
-                    color: root.errorMsg ? "#ff5555" : "#FF7300"
+                    color: root.errorMsg ? "#ff5555" : root.theme.s
                     font.pixelSize: parent.bigPx
                     font.bold: true
                     lineHeightMode: Text.FixedHeight
@@ -124,7 +163,7 @@ PlasmoidItem {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: root.loading || root.errorMsg ? "" : root.sessionResetsIn
-                    color: Qt.rgba(1, 0.44, 0, 0.65)
+                    color: root.theme.sDim
                     font.pixelSize: parent.smallPx
                     font.weight: Font.Medium
                     lineHeightMode: Text.FixedHeight
@@ -134,7 +173,7 @@ PlasmoidItem {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: root.loading || root.errorMsg ? "" : Math.round(root.weeklyPct) + "%"
-                    color: "#FFB347"
+                    color: root.theme.w
                     font.pixelSize: parent.bigPx
                     font.bold: true
                     lineHeightMode: Text.FixedHeight
@@ -143,7 +182,7 @@ PlasmoidItem {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: root.loading || root.errorMsg ? "" : root.weeklyResetsIn
-                    color: Qt.rgba(1, 0.7, 0.28, 0.65)
+                    color: root.theme.wDim
                     font.pixelSize: parent.smallPx
                     font.weight: Font.Medium
                     lineHeightMode: Text.FixedHeight
@@ -163,7 +202,7 @@ PlasmoidItem {
             Text {
                 width: compact.textW
                 text: root.loading ? "…" : root.errorMsg ? "!" : Math.round(root.sessionPct) + "%"
-                color: root.errorMsg ? "#ff5555" : "#FF7300"
+                color: root.errorMsg ? "#ff5555" : root.theme.s
                 font.pixelSize: Math.round(compact.h * 0.32)
                 font.bold: true
             }
@@ -279,8 +318,8 @@ PlasmoidItem {
                 ctx.clearRect(0, 0, width, height)
                 var cx = width / 2, cy = height / 2
                 var lw = Math.max(4, width * 0.055)
-                ring(ctx, cx, cy, width * 0.43, lw, root.weeklyPct,  "#FFB347", "rgba(255,179,71,0.12)")
-                ring(ctx, cx, cy, width * 0.29, lw, root.sessionPct, "#FF7300", "rgba(255,115,0,0.12)")
+                ring(ctx, cx, cy, width * 0.43, lw, root.weeklyPct,  root.theme.w,  root.theme.wT)
+                ring(ctx, cx, cy, width * 0.29, lw, root.sessionPct, root.theme.s,  root.theme.sT)
             }
             function ring(ctx, cx, cy, r, lw, pct, color, track) {
                 ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI)
@@ -306,7 +345,7 @@ PlasmoidItem {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: root.loading ? "…" : Math.round(root.sessionPct) + "%"
-                    color: "#FF7300"
+                    color: root.theme.s
                     font.pixelSize: Math.max(11, ringCanvas.width * 0.13)
                     font.bold: true
                 }
@@ -314,7 +353,7 @@ PlasmoidItem {
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: !fullView.minimal
                     text: i18n("SESSION")
-                    color: Qt.rgba(1, 0.44, 0, 0.5)
+                    color: root.theme.sLbl
                     font.pixelSize: Math.max(6, ringCanvas.width * 0.046)
                     font.letterSpacing: 1.5
                 }
@@ -381,9 +420,9 @@ PlasmoidItem {
 
             Row {
                 width: parent.width; spacing: 6
-                Rectangle { width:8; height:8; radius:4; color:"#FF7300"; anchors.verticalCenter: parent.verticalCenter }
+                Rectangle { width:8; height:8; radius:4; color:root.theme.s; anchors.verticalCenter: parent.verticalCenter }
                 Text { text: i18n("Session"); color:"white"; font.pixelSize:11; width:55 }
-                Text { text:Math.round(root.sessionPct)+"%"; color:"#FF7300"; font.pixelSize:11; font.bold:true; width:34 }
+                Text { text:Math.round(root.sessionPct)+"%"; color:root.theme.s; font.pixelSize:11; font.bold:true; width:34 }
                 Text { text:"↻ "+root.sessionResetsIn; color:Qt.rgba(1,1,1,0.4); font.pixelSize:10; anchors.verticalCenter:parent.verticalCenter }
             }
             Text {
@@ -394,9 +433,9 @@ PlasmoidItem {
             }
             Row {
                 width: parent.width; spacing: 6
-                Rectangle { width:8; height:8; radius:4; color:"#FFB347"; anchors.verticalCenter:parent.verticalCenter }
+                Rectangle { width:8; height:8; radius:4; color:root.theme.w; anchors.verticalCenter:parent.verticalCenter }
                 Text { text: i18n("Week"); color:"white"; font.pixelSize:11; width:55 }
-                Text { text:Math.round(root.weeklyPct)+"%"; color:"#FFB347"; font.pixelSize:11; font.bold:true; width:34 }
+                Text { text:Math.round(root.weeklyPct)+"%"; color:root.theme.w; font.pixelSize:11; font.bold:true; width:34 }
                 Text { text:"↻ "+root.weeklyResetsIn; color:Qt.rgba(1,1,1,0.4); font.pixelSize:10; anchors.verticalCenter:parent.verticalCenter }
             }
             Text {

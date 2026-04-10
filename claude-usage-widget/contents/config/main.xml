@@ -26,5 +26,8 @@
     <entry name="sidebarShortcuts" type="Bool">
       <default>true</default>
     </entry>
+    <entry name="colorTheme" type="String">
+      <default>amber</default>
+    </entry>
   </group>
 </kcfg>
