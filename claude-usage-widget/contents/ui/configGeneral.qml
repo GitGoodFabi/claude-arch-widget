@@ -7,6 +7,7 @@ Kirigami.FormLayout {
     id: configPage
 
     property alias cfg_colorTheme: themeCombo.currentValue
+    property alias cfg_widgetOpacity: widgetOpacitySlider.value
     property alias cfg_backgroundOpacity: opacitySlider.value
     property alias cfg_terminalApp: terminalField.text
     property alias cfg_timerEnabled: timerToggle.checked
@@ -52,6 +53,15 @@ Kirigami.FormLayout {
     }
 
     // ── Aussehen ──────────────────────────────────────────────────────────
+    PlasmaComponents.Slider {
+        id: widgetOpacitySlider
+        Kirigami.FormData.label: i18n("Widget opacity:")
+        from: 0.1; to: 1.0; stepSize: 0.05
+        PlasmaComponents.ToolTip {
+            text: Math.round(widgetOpacitySlider.value * 100) + "%"
+        }
+    }
+
     PlasmaComponents.Slider {
         id: opacitySlider
         Kirigami.FormData.label: i18n("Background opacity:")

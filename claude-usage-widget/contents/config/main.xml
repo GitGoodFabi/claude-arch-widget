@@ -29,5 +29,8 @@
     <entry name="colorTheme" type="String">
       <default>amber</default>
     </entry>
+    <entry name="widgetOpacity" type="Double">
+      <default>1.0</default>
+    </entry>
   </group>
 </kcfg>

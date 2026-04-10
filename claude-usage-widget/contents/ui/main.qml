@@ -83,6 +83,7 @@ PlasmoidItem {
     // ── Compact (Panel + Sidebar) ─────────────────────────────────────────
     compactRepresentation: Item {
         id: compact
+        opacity: Plasmoid.configuration.widgetOpacity
 
         readonly property bool vertical: Plasmoid.formFactor === PlasmaCore.Types.Vertical
 
@@ -246,6 +247,7 @@ PlasmoidItem {
     // ── Full (Desktop & Popup) ────────────────────────────────────────────
     fullRepresentation: Item {
         id: fullView
+        opacity: Plasmoid.configuration.widgetOpacity
 
         Layout.minimumWidth:   Plasmoid.configuration.minimalView ? 120 : 220
         Layout.minimumHeight:  Plasmoid.configuration.minimalView ? 120 : 300
