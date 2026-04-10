@@ -8,8 +8,20 @@
     <entry name="terminalApp" type="String">
       <default>konsole</default>
     </entry>
-    <entry name="refreshInterval" type="Int">
-      <default>5</default>
+    <entry name="timerEnabled" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="refreshIntervalSeconds" type="Int">
+      <default>300</default>
+    </entry>
+    <entry name="projectShortcutLabel" type="String">
+      <default></default>
+    </entry>
+    <entry name="projectShortcutUrl" type="String">
+      <default></default>
+    </entry>
+    <entry name="minimalView" type="Bool">
+      <default>false</default>
     </entry>
   </group>
 </kcfg>

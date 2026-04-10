@@ -18,15 +18,13 @@ PlasmoidItem {
     property string errorMsg: ""
     property bool loading: true
 
-    readonly property bool onDesktop: Plasmoid.formFactor === Plasmoid.Planar
+    readonly property bool onDesktop: Plasmoid.formFactor === PlasmaCore.Types.Planar
 
-    // Immer kein Plasma-Hintergrundkasten — wir zeichnen unseren eigenen
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
-
-
 
     preferredRepresentation: onDesktop ? fullRepresentation : compactRepresentation
 
+    Component.onCompleted: fetchData()
     onExpandedChanged: { if (expanded) fetchData() }
 
     // ── Compact (Panel) ───────────────────────────────────────────────────
@@ -95,22 +93,26 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: fullView
 
-        Layout.minimumWidth:   200
-        Layout.preferredWidth: 280
+        Layout.minimumWidth:   Plasmoid.configuration.minimalView ? 120 : 220
+        Layout.minimumHeight:  Plasmoid.configuration.minimalView ? 120 : 300
+        Layout.preferredWidth: Plasmoid.configuration.minimalView ? 160 : (onDesktop ? 340 : 280)
         Layout.fillWidth:      true
-        Layout.minimumHeight:  280
         Layout.fillHeight:     true
 
-        readonly property real pad:      16
-        readonly property real headerH:  36
-        readonly property real legendH:  108
-        readonly property real buttonsH: 64   // 2 Zeilen Buttons
-        readonly property real ringDiam: Math.max(60, Math.min(
-            width  - pad * 2,
-            height - headerH - legendH - buttonsH - pad * 3
-        ))
+        readonly property bool minimal: Plasmoid.configuration.minimalView
+        readonly property real pad:     16
+        readonly property real headerH: 36
+        readonly property real buttonsH: hasProjectShortcut ? 100 : 70
+        readonly property bool hasProjectShortcut:
+            Plasmoid.configuration.projectShortcutLabel !== "" &&
+            Plasmoid.configuration.projectShortcutUrl   !== ""
 
-        // Eigener Hintergrund (konfigurierbare Deckkraft)
+        readonly property real availH: height - headerH - buttonsH - pad * 3
+        readonly property real ringDiam: minimal
+            ? Math.max(80, Math.min(width, height) - pad)
+            : Math.max(80, Math.min(width - pad * 2, availH - 80))
+
+        // Eigener Hintergrund
         Rectangle {
             anchors.fill: parent
             radius: root.onDesktop ? 12 : 0
@@ -121,20 +123,22 @@ PlasmoidItem {
         // ── Header ──
         Item {
             id: header
+            visible: !fullView.minimal
             anchors { top: parent.top; left: parent.left; right: parent.right; margins: fullView.pad }
             height: fullView.headerH
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "Claude Pro"
-                color: "white"; font.bold: true; font.pixelSize: 14
+                color: "white"; font.bold: true
+                font.pixelSize: Math.max(13, fullView.ringDiam * 0.09)
             }
             PlasmaComponents.ToolButton {
                 anchors { right: parent.right; verticalCenter: parent.verticalCenter }
                 icon.name: "view-refresh"
                 opacity: root.loading ? 0.3 : 0.6
                 onClicked: fetchData()
-                PlasmaComponents.ToolTip { text: "Aktualisieren" }
+                PlasmaComponents.ToolTip { text: i18n("Refresh") }
             }
         }
 
@@ -142,7 +146,8 @@ PlasmoidItem {
         Text {
             visible: root.errorMsg !== ""
             anchors { top: header.bottom; left: parent.left; right: parent.right; margins: fullView.pad }
-            text: root.errorMsg; color: "#ff5555"; wrapMode: Text.Wrap; font.pixelSize: 11
+            text: root.errorMsg; color: "#ff5555"; wrapMode: Text.Wrap
+            font.pixelSize: Math.max(10, fullView.ringDiam * 0.07)
         }
 
         // ── Ringe ──
@@ -150,8 +155,8 @@ PlasmoidItem {
             id: ringCanvas
             visible: root.errorMsg === ""
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: header.bottom
-            anchors.topMargin: fullView.pad / 2
+            anchors.top: fullView.minimal ? parent.top : header.bottom
+            anchors.topMargin: fullView.minimal ? (parent.height - fullView.ringDiam) / 2 : fullView.pad / 2
             width:  fullView.ringDiam
             height: fullView.ringDiam
 
@@ -190,7 +195,7 @@ PlasmoidItem {
                 }
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: "SITZUNG"
+                    text: i18n("SESSION")
                     color: Qt.rgba(1,0.44,0,0.5)
                     font.pixelSize: Math.max(6, ringCanvas.width * 0.046)
                     font.letterSpacing: 1.5
@@ -201,7 +206,7 @@ PlasmoidItem {
         // ── Legende ──
         Column {
             id: legend
-            visible: root.errorMsg === ""
+            visible: root.errorMsg === "" && !fullView.minimal
             anchors { bottom: buttons.top; left: parent.left; right: parent.right
                       margins: fullView.pad; bottomMargin: 8 }
             spacing: 4
@@ -212,27 +217,29 @@ PlasmoidItem {
             Row {
                 width: parent.width; spacing: 6
                 Rectangle { width:8; height:8; radius:4; color:"#FF7300"; anchors.verticalCenter: parent.verticalCenter }
-                Text { text:"Sitzung"; color:"white"; font.pixelSize:11; width:55 }
+                Text { text: i18n("Session"); color:"white"; font.pixelSize:11; width:55 }
                 Text { text:Math.round(root.sessionPct)+"%"; color:"#FF7300"; font.pixelSize:11; font.bold:true; width:34 }
                 Text { text:"↻ "+root.sessionResetsIn; color:Qt.rgba(1,1,1,0.4); font.pixelSize:10; anchors.verticalCenter:parent.verticalCenter }
             }
             Text {
                 visible: root.sessionResetsAt !== ""
                 leftPadding: 14
-                text: "Reset um " + Qt.formatTime(new Date(root.sessionResetsAt), "hh:mm") + " Uhr"
+                text: i18n("Reset at %1", Qt.formatTime(new Date(root.sessionResetsAt), "hh:mm"))
                 color: Qt.rgba(1,1,1,0.28); font.pixelSize: 9
             }
             Row {
                 width: parent.width; spacing: 6
                 Rectangle { width:8; height:8; radius:4; color:"#FFB347"; anchors.verticalCenter:parent.verticalCenter }
-                Text { text:"Woche"; color:"white"; font.pixelSize:11; width:55 }
+                Text { text: i18n("Week"); color:"white"; font.pixelSize:11; width:55 }
                 Text { text:Math.round(root.weeklyPct)+"%"; color:"#FFB347"; font.pixelSize:11; font.bold:true; width:34 }
                 Text { text:"↻ "+root.weeklyResetsIn; color:Qt.rgba(1,1,1,0.4); font.pixelSize:10; anchors.verticalCenter:parent.verticalCenter }
             }
             Text {
                 visible: root.weeklyResetsAt !== ""
                 leftPadding: 14
-                text: "Reset " + Qt.formatDate(new Date(root.weeklyResetsAt),"dddd") + " um " + Qt.formatTime(new Date(root.weeklyResetsAt),"hh:mm") + " Uhr"
+                text: i18n("Reset on %1 at %2",
+                    Qt.formatDate(new Date(root.weeklyResetsAt), "dddd"),
+                    Qt.formatTime(new Date(root.weeklyResetsAt), "hh:mm"))
                 color: Qt.rgba(1,1,1,0.28); font.pixelSize: 9
             }
         }
@@ -240,18 +247,18 @@ PlasmoidItem {
         // ── Schnelllinks ──
         Column {
             id: buttons
+            visible: !fullView.minimal
             anchors { bottom: parent.bottom; left: parent.left; right: parent.right
                       margins: fullView.pad; bottomMargin: fullView.pad }
             spacing: 5
 
-            // Zeile 1: Web-Links
             Row {
                 width: parent.width; spacing: 5
                 Repeater {
                     model: [
-                        { label: "Neuer Chat", icon: "list-add",                 url: "https://claude.ai/new",           cmd: "" },
-                        { label: "Projekte",   icon: "folder",                   url: "https://claude.ai/projects",      cmd: "" },
-                        { label: "Nutzung",    icon: "utilities-system-monitor", url: "https://claude.ai/settings/usage", cmd: "" }
+                        { label: i18n("New Chat"), icon: "list-add",                 url: "https://claude.ai/new"            },
+                        { label: i18n("Projects"), icon: "folder",                   url: "https://claude.ai/projects"       },
+                        { label: i18n("Usage"),    icon: "utilities-system-monitor", url: "https://claude.ai/settings/usage" }
                     ]
                     PlasmaComponents.Button {
                         width: (buttons.width - 10) / 3
@@ -261,25 +268,31 @@ PlasmoidItem {
                 }
             }
 
-            // Zeile 2: App-Links
             Row {
                 width: parent.width; spacing: 5
 
-                // Claude Code im Terminal
                 PlasmaComponents.Button {
                     width: (buttons.width - 5) / 2
                     text: "Claude CLI"
                     icon.name: "utilities-terminal"
                     font.pixelSize: 10
                     onClicked: {
-                        var term = Plasmoid.configuration.terminalApp || "konsole"
-                        executable.connectSource(term + " --noclose -e claude")
+                        var term = Plasmoid.configuration.terminalApp.trim() || "konsole"
+                        var cmd
+                        if (term === "konsole")
+                            cmd = "konsole --noclose -e claude"
+                        else if (term === "gnome-terminal" || term === "xfce4-terminal")
+                            cmd = term + " -- claude"
+                        else if (term === "kitty" || term === "foot" || term === "wezterm")
+                            cmd = term + " claude"
+                        else
+                            cmd = term + " -e claude"
+                        executable.connectSource(cmd)
                         root.expanded = false
                     }
-                    PlasmaComponents.ToolTip { text: "Claude Code im Terminal öffnen" }
+                    PlasmaComponents.ToolTip { text: i18n("Open Claude Code in terminal") }
                 }
 
-                // VS Code (letztes Fenster)
                 PlasmaComponents.Button {
                     width: (buttons.width - 5) / 2
                     text: "VS Code"
@@ -289,7 +302,24 @@ PlasmoidItem {
                         executable.connectSource("code --reuse-window")
                         root.expanded = false
                     }
-                    PlasmaComponents.ToolTip { text: "Letztes VS Code Fenster öffnen" }
+                    PlasmaComponents.ToolTip { text: i18n("Open last VS Code window") }
+                }
+            }
+
+            Row {
+                width: parent.width
+                visible: fullView.hasProjectShortcut
+
+                PlasmaComponents.Button {
+                    width: parent.width
+                    text: Plasmoid.configuration.projectShortcutLabel
+                    icon.name: "folder-open"
+                    font.pixelSize: 10
+                    onClicked: {
+                        Qt.openUrlExternally(Plasmoid.configuration.projectShortcutUrl)
+                        root.expanded = false
+                    }
+                    PlasmaComponents.ToolTip { text: Plasmoid.configuration.projectShortcutUrl }
                 }
             }
         }
@@ -302,11 +332,10 @@ PlasmoidItem {
         connectedSources: []
         onNewData: function(source, data) {
             disconnectSource(source)
-            // Nur JSON-Antworten vom Fetch-Script verarbeiten
             var out = (data["stdout"] || "").trim()
             if (!out.startsWith("{")) return
             root.loading = false
-            if (data["exit code"] !== 0 || out === "") {
+            if (data["exit code"] !== 0) {
                 root.errorMsg = (data["stderr"] || "Script fehlgeschlagen").trim()
                 return
             }
@@ -333,8 +362,9 @@ PlasmoidItem {
     }
 
     Timer {
-        interval: Math.max(1, Plasmoid.configuration.refreshInterval) * 60 * 1000
-        running: true; repeat: true; triggeredOnStart: true
+        interval: Math.max(5, Plasmoid.configuration.refreshIntervalSeconds) * 1000
+        running: Plasmoid.configuration.timerEnabled
+        repeat: true
         onTriggered: fetchData()
     }
 }

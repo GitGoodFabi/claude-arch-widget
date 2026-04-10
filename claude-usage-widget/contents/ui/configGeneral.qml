@@ -8,28 +8,76 @@ Kirigami.FormLayout {
 
     property alias cfg_backgroundOpacity: opacitySlider.value
     property alias cfg_terminalApp: terminalField.text
-    property alias cfg_refreshInterval: refreshSpinBox.value
+    property alias cfg_timerEnabled: timerToggle.checked
+    property alias cfg_refreshIntervalSeconds: intervalCombo.currentValue
+    property alias cfg_projectShortcutLabel: projectLabelField.text
+    property alias cfg_projectShortcutUrl: projectUrlField.text
+    property alias cfg_minimalView: minimalToggle.checked
 
+    // ── Ansicht ───────────────────────────────────────────────────────────
+    PlasmaComponents.CheckBox {
+        id: minimalToggle
+        Kirigami.FormData.label: i18n("View (Desktop):")
+        text: i18n("Rings & numbers only")
+    }
+
+    // ── Aussehen ──────────────────────────────────────────────────────────
     PlasmaComponents.Slider {
-            id: opacitySlider
-            Kirigami.FormData.label: "Hintergrund-Deckkraft:"
-            from: 0.0; to: 1.0; stepSize: 0.05
-            PlasmaComponents.ToolTip {
-                text: Math.round(opacitySlider.value * 100) + "%"
+        id: opacitySlider
+        Kirigami.FormData.label: i18n("Background opacity:")
+        from: 0.0; to: 1.0; stepSize: 0.05
+        PlasmaComponents.ToolTip {
+            text: Math.round(opacitySlider.value * 100) + "%"
+        }
+    }
+
+    // ── Terminal ─────────────────────────────────────────────────────────
+    PlasmaComponents.TextField {
+        id: terminalField
+        Kirigami.FormData.label: i18n("Terminal app:")
+        placeholderText: i18n("e.g. konsole, kitty, alacritty")
+    }
+
+    // ── Auto-Refresh ─────────────────────────────────────────────────────
+    PlasmaComponents.CheckBox {
+        id: timerToggle
+        Kirigami.FormData.label: i18n("Auto-refresh:")
+        text: i18n("Enabled")
+    }
+
+    PlasmaComponents.ComboBox {
+        id: intervalCombo
+        Kirigami.FormData.label: i18n("Interval:")
+        enabled: timerToggle.checked
+        textRole: "label"
+        valueRole: "value"
+        model: [
+            { label: i18n("5 seconds"),  value: 5   },
+            { label: i18n("30 seconds"), value: 30  },
+            { label: i18n("2 minutes"),  value: 120 },
+            { label: i18n("5 minutes"),  value: 300 },
+            { label: i18n("10 minutes"), value: 600 }
+        ]
+        Component.onCompleted: {
+            for (var i = 0; i < model.length; i++) {
+                if (model[i].value === cfg_refreshIntervalSeconds) {
+                    currentIndex = i
+                    break
+                }
             }
         }
+    }
+
+    // ── Projekt-Shortcut ─────────────────────────────────────────────────
+    PlasmaComponents.TextField {
+        id: projectLabelField
+        Kirigami.FormData.label: i18n("Project shortcut:")
+        placeholderText: i18n("Name (e.g. My Project)")
+    }
 
     PlasmaComponents.TextField {
-            id: terminalField
-            Kirigami.FormData.label: "Terminal-App:"
-            placeholderText: "z.B. konsole, kitty, alacritty"
-        }
-
-    PlasmaComponents.SpinBox {
-            id: refreshSpinBox
-            Kirigami.FormData.label: "Auto-Refresh:"
-            from: 1; to: 60; stepSize: 1
-            textFromValue: function(val, locale) { return val + " min" }
-            valueFromText: function(text, locale) { return parseInt(text) }
-        }
+        id: projectUrlField
+        Kirigami.FormData.label: i18n("Project URL:")
+        placeholderText: "https://claude.ai/project/..."
+    }
 }

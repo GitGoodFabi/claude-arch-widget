@@ -1,0 +1,89 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: es\n"
+
+msgid "Refresh"
+msgstr "Actualizar"
+
+msgid "SESSION"
+msgstr "SESIÓN"
+
+msgid "Session"
+msgstr "Sesión"
+
+msgid "Week"
+msgstr "Semana"
+
+msgid "Reset at %1"
+msgstr "Reinicio a las %1"
+
+msgid "Reset on %1 at %2"
+msgstr "Reinicio el %1 a las %2"
+
+msgid "New Chat"
+msgstr "Nuevo chat"
+
+msgid "Projects"
+msgstr "Proyectos"
+
+msgid "Usage"
+msgstr "Uso"
+
+msgid "Open Claude Code in terminal"
+msgstr "Abrir Claude Code en terminal"
+
+msgid "Open last VS Code window"
+msgstr "Abrir última ventana de VS Code"
+
+msgid "View (Desktop):"
+msgstr "Vista (Escritorio):"
+
+msgid "Rings & numbers only"
+msgstr "Solo anillos y números"
+
+msgid "Background opacity:"
+msgstr "Opacidad del fondo:"
+
+msgid "Terminal app:"
+msgstr "Aplicación de terminal:"
+
+msgid "Auto-refresh:"
+msgstr "Actualización automática:"
+
+msgid "Enabled"
+msgstr "Activado"
+
+msgid "Interval:"
+msgstr "Intervalo:"
+
+msgid "5 seconds"
+msgstr "5 segundos"
+
+msgid "30 seconds"
+msgstr "30 segundos"
+
+msgid "2 minutes"
+msgstr "2 minutos"
+
+msgid "5 minutes"
+msgstr "5 minutos"
+
+msgid "10 minutes"
+msgstr "10 minutos"
+
+msgid "Project shortcut:"
+msgstr "Acceso directo al proyecto:"
+
+msgid "Project URL:"
+msgstr "URL del proyecto:"
+
+msgid "Name (e.g. My Project)"
+msgstr "Nombre (ej. Mi proyecto)"
+
+msgid "e.g. konsole, kitty, alacritty"
+msgstr "ej. konsole, kitty, alacritty"
+
+msgid "General"
+msgstr "General"
