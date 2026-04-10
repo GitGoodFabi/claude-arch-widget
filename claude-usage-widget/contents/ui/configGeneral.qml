@@ -13,12 +13,19 @@ Kirigami.FormLayout {
     property alias cfg_projectShortcutLabel: projectLabelField.text
     property alias cfg_projectShortcutUrl: projectUrlField.text
     property alias cfg_minimalView: minimalToggle.checked
+    property alias cfg_sidebarShortcuts: sidebarShortcutsToggle.checked
 
     // ── Ansicht ───────────────────────────────────────────────────────────
     PlasmaComponents.CheckBox {
         id: minimalToggle
         Kirigami.FormData.label: i18n("View (Desktop):")
         text: i18n("Rings & numbers only")
+    }
+
+    PlasmaComponents.CheckBox {
+        id: sidebarShortcutsToggle
+        Kirigami.FormData.label: i18n("Sidebar shortcuts:")
+        text: i18n("Show below rings")
     }
 
     // ── Aussehen ──────────────────────────────────────────────────────────

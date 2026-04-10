@@ -12,8 +12,8 @@
         "Id": "com.github.fabian.claude-usage",
         "License": "MIT",
         "Name": "Claude Usage",
-        "Version": "1.0",
-        "Website": ""
+        "Version": "1.1",
+        "Website": "https://github.com/GitGoodFabi/claude-arch-widget"
     },
     "X-Plasma-API-Minimum-Version": "6.0",
     "KPackageStructure": "Plasma/Applet"

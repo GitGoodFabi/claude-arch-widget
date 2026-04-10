@@ -1,42 +1,120 @@
 #!/usr/bin/env bash
-set -e
+# Claude Usage Widget — Setup Script
+set -euo pipefail
 
-WIDGET_DIR="$(cd "$(dirname "$0")" && pwd)/claude-usage-widget"
-SCRIPT_SRC="$(cd "$(dirname "$0")" && pwd)/claude_usage.py"
-SCRIPT_DST="$HOME/Claude Arch Widget/claude_usage.py"
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$HOME/.config/claude-widget"
+SCRIPT_DST="$CONFIG_DIR/claude_usage.py"
+PLASMOID_ID="com.github.fabian.claude-usage"
+PLASMOID_DST="$HOME/.local/share/plasma/plasmoids/$PLASMOID_ID"
 
-echo "=== Claude Usage Widget Setup ==="
-echo ""
+# ── Colors ────────────────────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 
-# 1. Session key
+step()  { echo -e "\n${CYAN}${BOLD}▸ $*${NC}"; }
+ok()    { echo -e "  ${GREEN}✓ $*${NC}"; }
+warn()  { echo -e "  ${YELLOW}⚠ $*${NC}"; }
+err()   { echo -e "  ${RED}✗ $*${NC}"; }
+prompt(){ echo -en "  ${BOLD}$*${NC} "; }
+
+echo -e "\n${CYAN}${BOLD}╔══════════════════════════════════════╗"
+echo -e "║    Claude Usage Widget  —  Setup    ║"
+echo -e "╚══════════════════════════════════════╝${NC}"
+
+# ── 1. Config directory ───────────────────────────────────────────────────────
+step "Creating config directory..."
 mkdir -p "$CONFIG_DIR"
-if [ ! -f "$CONFIG_DIR/session.txt" ] || [ ! -s "$CONFIG_DIR/session.txt" ]; then
-    echo "Paste your claude.ai sessionKey cookie value (from DevTools → Cookies):"
-    echo -n "> "
-    read -r SESSION_KEY
-    echo "$SESSION_KEY" > "$CONFIG_DIR/session.txt"
-    chmod 600 "$CONFIG_DIR/session.txt"
-    echo "Session key saved to $CONFIG_DIR/session.txt"
-else
-    echo "Session key already exists at $CONFIG_DIR/session.txt"
+chmod 700 "$CONFIG_DIR"
+ok "Config dir: $CONFIG_DIR"
+
+# ── 2. Install fetch script ───────────────────────────────────────────────────
+step "Installing fetch script..."
+cp "$REPO_DIR/claude_usage.py" "$SCRIPT_DST"
+chmod 755 "$SCRIPT_DST"
+ok "Script installed: $SCRIPT_DST"
+
+# ── 3. Session key ────────────────────────────────────────────────────────────
+step "Setting up session key..."
+
+if [ -f "$CONFIG_DIR/session.txt" ] && [ -s "$CONFIG_DIR/session.txt" ]; then
+    warn "Session key already exists at $CONFIG_DIR/session.txt"
+    prompt "Re-use it? [Y/n]:"
+    read -r REUSE
+    if [[ "${REUSE:-Y}" =~ ^[Yy]$ ]]; then
+        ok "Using existing session key."
+        HAVE_KEY=1
+    fi
 fi
 
-# 2. Test the script
-echo ""
-echo "Testing data fetch..."
-OUTPUT=$(python3 "$SCRIPT_SRC" 2>&1)
-echo "$OUTPUT" | python3 -m json.tool 2>/dev/null || echo "$OUTPUT"
+if [ "${HAVE_KEY:-0}" = "0" ]; then
+    echo -e "  Trying to extract session key from your browser..."
+    SESSION_KEY="$(python3 "$REPO_DIR/extract_cookie.py" 2>/dev/tty)" || SESSION_KEY=""
 
-# 3. Install widget
-echo ""
-echo "Installing Plasma widget..."
-plasmapkg2 --install "$WIDGET_DIR" 2>/dev/null || \
-    plasmapkg2 --upgrade "$WIDGET_DIR" 2>/dev/null || \
-    kpackagetool6 --install "$WIDGET_DIR" 2>/dev/null || \
-    kpackagetool6 --upgrade "$WIDGET_DIR" 2>/dev/null || \
-    { echo "ERROR: Could not install widget. Try manually:"; echo "  kpackagetool6 --install '$WIDGET_DIR'"; exit 1; }
+    if [ -n "$SESSION_KEY" ]; then
+        echo "$SESSION_KEY" > "$CONFIG_DIR/session.txt"
+        chmod 600 "$CONFIG_DIR/session.txt"
+        ok "Session key extracted from browser automatically."
+    else
+        warn "Could not auto-extract. Please paste it manually."
+        echo ""
+        echo -e "  ${BOLD}How to get your session key:${NC}"
+        echo "  1. Open https://claude.ai in your browser and log in"
+        echo "  2. Press F12 → Application tab → Cookies → https://claude.ai"
+        echo "  3. Find the cookie named  sessionKey  and copy its Value"
+        echo ""
+        prompt "Paste sessionKey here:"
+        read -r SESSION_KEY
+        if [ -z "$SESSION_KEY" ]; then
+            err "No session key provided. Aborting."
+            exit 1
+        fi
+        echo "$SESSION_KEY" > "$CONFIG_DIR/session.txt"
+        chmod 600 "$CONFIG_DIR/session.txt"
+        ok "Session key saved."
+    fi
+fi
 
+# ── 4. Test data fetch ────────────────────────────────────────────────────────
+step "Testing data fetch..."
+OUTPUT="$(python3 "$SCRIPT_DST" 2>&1)"
+
+if python3 -c "import sys,json; d=json.loads(sys.stdin.read()); exit(0 if 'session' in d else 1)" <<< "$OUTPUT" 2>/dev/null; then
+    ok "Data fetch successful!"
+    echo "$OUTPUT" | python3 -m json.tool 2>/dev/null || echo "$OUTPUT"
+else
+    err "Fetch failed."
+    echo "  Response: $OUTPUT"
+    echo ""
+    warn "Your session key might be expired or wrong."
+    warn "Delete $CONFIG_DIR/session.txt and re-run setup.sh to try again."
+    exit 1
+fi
+
+# ── 5. Install widget ─────────────────────────────────────────────────────────
+step "Installing Plasma widget..."
+mkdir -p "$PLASMOID_DST"
+cp -r "$REPO_DIR/claude-usage-widget/." "$PLASMOID_DST/"
+ok "Widget installed: $PLASMOID_DST"
+
+# ── 6. Restart Plasma ─────────────────────────────────────────────────────────
+step "Restarting Plasma shell..."
+if kquitapp6 plasmashell 2>/dev/null; then
+    sleep 1
+    kstart plasmashell &>/dev/null &
+    ok "Plasma shell restarting in background."
+else
+    warn "Could not restart plasmashell automatically."
+    warn "Please log out and back in, or run:  kquitapp6 plasmashell && kstart plasmashell"
+fi
+
+# ── Done ──────────────────────────────────────────────────────────────────────
+echo -e "\n${GREEN}${BOLD}╔══════════════════════════════════════╗"
+echo -e "║          Setup complete!             ║"
+echo -e "╚══════════════════════════════════════╝${NC}"
+echo -e "  Right-click your panel or desktop"
+echo -e "  → ${BOLD}Add Widgets${NC} → search for ${BOLD}Claude Usage${NC}"
 echo ""
-echo "=== Done! ==="
-echo "Right-click your desktop or panel → Add Widgets → search for 'Claude Usage'"
+echo -e "  ${YELLOW}Session key expires when you log out of claude.ai."
+echo -e "  Re-run setup.sh to refresh it.${NC}"
+echo ""

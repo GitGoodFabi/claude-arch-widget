@@ -27,63 +27,178 @@ PlasmoidItem {
     Component.onCompleted: fetchData()
     onExpandedChanged: { if (expanded) fetchData() }
 
-    // ── Compact (Panel) ───────────────────────────────────────────────────
+    function terminalCmd() {
+        var term = Plasmoid.configuration.terminalApp.trim() || "konsole"
+        // Login-Shell (-l) damit ~/.local/bin im PATH ist; exec bash hält Terminal offen
+        if (term === "konsole")
+            return "konsole --noclose -e bash -lc 'claude; exec bash'"
+        if (term === "gnome-terminal" || term === "xfce4-terminal")
+            return term + " -- bash -lc 'claude; exec bash'"
+        if (term === "kitty" || term === "foot")
+            return term + " bash -lc 'claude; exec bash'"
+        if (term === "wezterm")
+            return "wezterm start bash -lc 'claude; exec bash'"
+        return term + " -e bash -lc 'claude; exec bash'"
+    }
+
+    // ── Compact (Panel + Sidebar) ─────────────────────────────────────────
     compactRepresentation: Item {
-        Layout.minimumWidth: compactRow.implicitWidth + 8
-        Layout.minimumHeight: Kirigami.Units.iconSizes.medium
+        id: compact
 
-        MouseArea {
-            anchors.fill: parent
-            onClicked: root.expanded = !root.expanded
-        }
+        readonly property bool vertical: Plasmoid.formFactor === PlasmaCore.Types.Vertical
 
-        Row {
-            id: compactRow
-            anchors.centerIn: parent
-            spacing: 5
+        // h = kurze Seite des Panels (Höhe horizontal, Breite vertikal)
+        readonly property real h:       vertical ? parent.width : parent.height
+        readonly property real iconSize: Math.round(h * 0.84)
+        readonly property real textW:   Math.round(h * 1.6)
+        readonly property real totalW:  iconSize + textW + Math.round(h * 0.25)
 
-            Canvas {
-                id: compactCanvas
-                width: 22; height: 22
-                anchors.verticalCenter: parent.verticalCenter
+        Layout.minimumWidth:   vertical ? parent.width : totalW
+        Layout.preferredWidth: vertical ? parent.width : totalW
+        Layout.minimumHeight:  vertical ? iconSize + Math.round(h * 0.08) : parent.height
+        Layout.fillHeight:     !vertical
+        Layout.fillWidth:      vertical
 
-                onPaint: {
-                    var ctx = getContext("2d")
-                    ctx.clearRect(0, 0, width, height)
-                    var cx = width/2, cy = height/2
-                    arc(ctx, cx, cy, 9.5, 3, 1.0,                  "rgba(255,179,71,0.18)")
-                    arc(ctx, cx, cy, 9.5, 3, root.weeklyPct/100,   "#FFB347")
-                    arc(ctx, cx, cy, 5.5, 3, 1.0,                  "rgba(255,115,0,0.18)")
-                    arc(ctx, cx, cy, 5.5, 3, root.sessionPct/100,  "#FF7300")
-                }
-                function arc(ctx, cx, cy, r, lw, frac, color) {
-                    ctx.beginPath()
-                    if      (frac >= 1.0) ctx.arc(cx,cy,r, 0, 2*Math.PI)
-                    else if (frac >  0)   ctx.arc(cx,cy,r, -Math.PI/2, -Math.PI/2 + 2*Math.PI*frac)
-                    else return
-                    ctx.strokeStyle = color; ctx.lineWidth = lw
-                    ctx.lineCap = frac >= 1.0 ? "butt" : "round"
-                    ctx.stroke()
-                }
-                Connections {
-                    target: root
-                    function onSessionPctChanged() { compactCanvas.requestPaint() }
-                    function onWeeklyPctChanged()  { compactCanvas.requestPaint() }
-                    function onLoadingChanged()    { compactCanvas.requestPaint() }
-                }
+        MouseArea { anchors.fill: parent; onClicked: root.expanded = !root.expanded }
+
+        // ── Ring-Canvas ───────────────────────────────────────────────────
+        Canvas {
+            id: compactCanvas
+            width:  compact.iconSize
+            height: compact.iconSize
+
+            // Sidebar: oben zentriert; Horizontal: links, zentriert
+            anchors.horizontalCenter: compact.vertical ? parent.horizontalCenter : undefined
+            anchors.verticalCenter:   compact.vertical ? undefined               : parent.verticalCenter
+            anchors.top:              compact.vertical ? parent.top              : undefined
+            anchors.topMargin:        compact.vertical ? Math.round((parent.width - compact.iconSize) / 2) : 0
+            anchors.left:             compact.vertical ? undefined               : parent.left
+            anchors.leftMargin:       compact.vertical ? 0                       : Math.round((parent.height - compact.iconSize) / 2)
+
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.clearRect(0, 0, width, height)
+                var cx = width / 2, cy = height / 2
+                var lw = Math.max(2, width * 0.08)
+                arc(ctx, cx, cy, width * 0.44, lw, 1.0,                  "rgba(255,179,71,0.18)")
+                arc(ctx, cx, cy, width * 0.44, lw, root.weeklyPct  / 100, "#FFB347")
+                arc(ctx, cx, cy, width * 0.33, lw, 1.0,                  "rgba(255,115,0,0.18)")
+                arc(ctx, cx, cy, width * 0.33, lw, root.sessionPct / 100, "#FF7300")
             }
+            function arc(ctx, cx, cy, r, lw, frac, color) {
+                ctx.beginPath()
+                if      (frac >= 1.0) ctx.arc(cx, cy, r, 0, 2 * Math.PI)
+                else if (frac >  0)   ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * frac)
+                else return
+                ctx.strokeStyle = color; ctx.lineWidth = lw
+                ctx.lineCap = frac >= 1.0 ? "butt" : "round"
+                ctx.stroke()
+            }
+            Connections {
+                target: root
+                function onSessionPctChanged() { compactCanvas.requestPaint() }
+                function onWeeklyPctChanged()  { compactCanvas.requestPaint() }
+                function onLoadingChanged()    { compactCanvas.requestPaint() }
+            }
+            onWidthChanged: requestPaint()
 
+            // Sidebar: alle 4 Werte in die Ringmitte (FixedHeight = kein Standard-Leading)
             Column {
-                anchors.verticalCenter: parent.verticalCenter
+                visible: compact.vertical
+                anchors.centerIn: parent
                 spacing: 0
+
+                readonly property real bigPx:   Math.max(8,  compactCanvas.width * 0.11)
+                readonly property real smallPx: Math.max(6,  compactCanvas.width * 0.08)
+                readonly property real gapH:    Math.max(1,  compactCanvas.width * 0.015)
+
                 Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
                     text: root.loading ? "…" : root.errorMsg ? "!" : Math.round(root.sessionPct) + "%"
                     color: root.errorMsg ? "#ff5555" : "#FF7300"
-                    font.pixelSize: 10; font.bold: true
+                    font.pixelSize: parent.bigPx
+                    font.bold: true
+                    lineHeightMode: Text.FixedHeight
+                    lineHeight: parent.bigPx * 1.15
                 }
                 Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
                     text: root.loading || root.errorMsg ? "" : root.sessionResetsIn
-                    color: Kirigami.Theme.disabledTextColor; font.pixelSize: 8
+                    color: Qt.rgba(1, 0.44, 0, 0.65)
+                    font.pixelSize: parent.smallPx
+                    font.weight: Font.Medium
+                    lineHeightMode: Text.FixedHeight
+                    lineHeight: parent.smallPx * 1.15
+                }
+                Item { width: 1; height: parent.gapH }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: root.loading || root.errorMsg ? "" : Math.round(root.weeklyPct) + "%"
+                    color: "#FFB347"
+                    font.pixelSize: parent.bigPx
+                    font.bold: true
+                    lineHeightMode: Text.FixedHeight
+                    lineHeight: parent.bigPx * 1.15
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: root.loading || root.errorMsg ? "" : root.weeklyResetsIn
+                    color: Qt.rgba(1, 0.7, 0.28, 0.65)
+                    font.pixelSize: parent.smallPx
+                    font.weight: Font.Medium
+                    lineHeightMode: Text.FixedHeight
+                    lineHeight: parent.smallPx * 1.15
+                }
+            }
+        }
+
+        // Horizontal-Panel: Text rechts neben dem Ring
+        Column {
+            visible: !compact.vertical
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.left:           compactCanvas.right
+            anchors.leftMargin:     Math.round(compact.h * 0.15)
+            spacing: 0
+
+            Text {
+                width: compact.textW
+                text: root.loading ? "…" : root.errorMsg ? "!" : Math.round(root.sessionPct) + "%"
+                color: root.errorMsg ? "#ff5555" : "#FF7300"
+                font.pixelSize: Math.round(compact.h * 0.32)
+                font.bold: true
+            }
+            Text {
+                width: compact.textW
+                text: root.loading || root.errorMsg ? "" : root.sessionResetsIn
+                color: Kirigami.Theme.disabledTextColor
+                font.pixelSize: Math.round(compact.h * 0.22)
+            }
+        }
+
+        // Sidebar-Shortcuts (optional, Icon-Buttons unter dem Ring)
+        Column {
+            visible: compact.vertical && Plasmoid.configuration.sidebarShortcuts
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top:              compactCanvas.bottom
+            anchors.topMargin:        Math.round(compact.h * 0.08)
+            spacing:                  Math.round(compact.h * 0.05)
+
+            Repeater {
+                model: {
+                    var items = [
+                        { icon: "list-add",                 url: "https://claude.ai/new",            tip: i18n("New Chat") },
+                        { icon: "utilities-system-monitor", url: "https://claude.ai/settings/usage", tip: i18n("Usage")    }
+                    ]
+                    if (Plasmoid.configuration.projectShortcutLabel !== "" && Plasmoid.configuration.projectShortcutUrl !== "")
+                        items.push({ icon: "folder-open", url: Plasmoid.configuration.projectShortcutUrl, tip: Plasmoid.configuration.projectShortcutLabel })
+                    return items
+                }
+                PlasmaComponents.ToolButton {
+                    width:  Math.round(compact.h * 0.55)
+                    height: Math.round(compact.h * 0.55)
+                    icon.name: modelData.icon
+                    onClicked: Qt.openUrlExternally(modelData.url)
+                    PlasmaComponents.ToolTip { text: modelData.tip }
                 }
             }
         }
@@ -95,7 +210,7 @@ PlasmoidItem {
 
         Layout.minimumWidth:   Plasmoid.configuration.minimalView ? 120 : 220
         Layout.minimumHeight:  Plasmoid.configuration.minimalView ? 120 : 300
-        Layout.preferredWidth: Plasmoid.configuration.minimalView ? 160 : (onDesktop ? 340 : 280)
+        Layout.preferredWidth: Plasmoid.configuration.minimalView ? 180 : (onDesktop ? 340 : 280)
         Layout.fillWidth:      true
         Layout.fillHeight:     true
 
@@ -109,10 +224,9 @@ PlasmoidItem {
 
         readonly property real availH: height - headerH - buttonsH - pad * 3
         readonly property real ringDiam: minimal
-            ? Math.max(80, Math.min(width, height) - pad)
+            ? Math.max(80, Math.min(width, height) - pad * 2)
             : Math.max(80, Math.min(width - pad * 2, availH - 80))
 
-        // Eigener Hintergrund
         Rectangle {
             anchors.fill: parent
             radius: root.onDesktop ? 12 : 0
@@ -120,7 +234,7 @@ PlasmoidItem {
             opacity: Plasmoid.configuration.backgroundOpacity
         }
 
-        // ── Header ──
+        // ── Header (nur full) ──
         Item {
             id: header
             visible: !fullView.minimal
@@ -155,7 +269,7 @@ PlasmoidItem {
             id: ringCanvas
             visible: root.errorMsg === ""
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: fullView.minimal ? parent.top : header.bottom
+            anchors.top:       fullView.minimal ? parent.top : header.bottom
             anchors.topMargin: fullView.minimal ? (parent.height - fullView.ringDiam) / 2 : fullView.pad / 2
             width:  fullView.ringDiam
             height: fullView.ringDiam
@@ -163,18 +277,18 @@ PlasmoidItem {
             onPaint: {
                 var ctx = getContext("2d")
                 ctx.clearRect(0, 0, width, height)
-                var cx = width/2, cy = height/2
-                var lw = Math.max(5, width * 0.068)
-                ring(ctx, cx, cy, width*0.43, lw, root.weeklyPct,  "#FFB347", "rgba(255,179,71,0.12)")
-                ring(ctx, cx, cy, width*0.31, lw, root.sessionPct, "#FF7300", "rgba(255,115,0,0.12)")
+                var cx = width / 2, cy = height / 2
+                var lw = Math.max(4, width * 0.055)
+                ring(ctx, cx, cy, width * 0.43, lw, root.weeklyPct,  "#FFB347", "rgba(255,179,71,0.12)")
+                ring(ctx, cx, cy, width * 0.29, lw, root.sessionPct, "#FF7300", "rgba(255,115,0,0.12)")
             }
             function ring(ctx, cx, cy, r, lw, pct, color, track) {
-                ctx.beginPath(); ctx.arc(cx,cy,r,0,2*Math.PI)
-                ctx.strokeStyle=track; ctx.lineWidth=lw; ctx.lineCap="butt"; ctx.stroke()
-                var f = Math.min(Math.max(pct,0),100)/100
-                if (f<=0) return
-                ctx.beginPath(); ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+2*Math.PI*f)
-                ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.lineCap="round"; ctx.stroke()
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI)
+                ctx.strokeStyle = track; ctx.lineWidth = lw; ctx.lineCap = "butt"; ctx.stroke()
+                var f = Math.min(Math.max(pct, 0), 100) / 100
+                if (f <= 0) return
+                ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * f)
+                ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = "round"; ctx.stroke()
             }
             Connections {
                 target: root
@@ -184,26 +298,77 @@ PlasmoidItem {
             }
             onWidthChanged: requestPaint()
 
+            // Text in Ringmitte — sauber für beide Ansichten
             Column {
-                anchors.centerIn: parent; spacing: 2
+                anchors.centerIn: parent
+                spacing: 2
+
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: root.loading ? "…" : Math.round(root.sessionPct) + "%"
                     color: "#FF7300"
-                    font.pixelSize: Math.max(12, ringCanvas.width * 0.13)
+                    font.pixelSize: Math.max(11, ringCanvas.width * 0.13)
                     font.bold: true
                 }
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
+                    visible: !fullView.minimal
                     text: i18n("SESSION")
-                    color: Qt.rgba(1,0.44,0,0.5)
+                    color: Qt.rgba(1, 0.44, 0, 0.5)
                     font.pixelSize: Math.max(6, ringCanvas.width * 0.046)
                     font.letterSpacing: 1.5
                 }
             }
         }
 
-        // ── Legende ──
+        // Minimal-View: Klick auf Ring öffnet Shortcut-Popup
+        MouseArea {
+            anchors.fill: ringCanvas
+            visible: fullView.minimal
+            cursorShape: Qt.PointingHandCursor
+            onClicked: minimalPopup.visible = !minimalPopup.visible
+        }
+
+        Rectangle {
+            id: minimalPopup
+            visible: false
+            anchors.centerIn: parent
+            width: parent.width - fullView.pad * 2
+            height: minimalPopupCol.implicitHeight + fullView.pad * 2
+            color: "#2a2a30"; radius: 10; z: 10
+
+            MouseArea { anchors.fill: parent }
+
+            Column {
+                id: minimalPopupCol
+                anchors { top: parent.top; left: parent.left; right: parent.right; margins: fullView.pad }
+                spacing: 6
+
+                Repeater {
+                    model: {
+                        var items = [
+                            { label: i18n("New Chat"), icon: "list-add",                 url: "https://claude.ai/new"            },
+                            { label: i18n("Usage"),    icon: "utilities-system-monitor", url: "https://claude.ai/settings/usage" }
+                        ]
+                        if (Plasmoid.configuration.projectShortcutLabel !== "" && Plasmoid.configuration.projectShortcutUrl !== "")
+                            items.push({ label: Plasmoid.configuration.projectShortcutLabel, icon: "folder-open", url: Plasmoid.configuration.projectShortcutUrl })
+                        return items
+                    }
+                    PlasmaComponents.Button {
+                        width: parent.width
+                        text: modelData.label; icon.name: modelData.icon; font.pixelSize: 10
+                        onClicked: { Qt.openUrlExternally(modelData.url); minimalPopup.visible = false }
+                    }
+                }
+                PlasmaComponents.Button {
+                    width: parent.width
+                    text: i18n("Close"); icon.name: "window-close"; font.pixelSize: 10
+                    onClicked: minimalPopup.visible = false
+                }
+            }
+        }
+
+        // ── Legende (full view only) ──
         Column {
             id: legend
             visible: root.errorMsg === "" && !fullView.minimal
@@ -244,7 +409,7 @@ PlasmoidItem {
             }
         }
 
-        // ── Schnelllinks ──
+        // ── Schnelllinks (full view only) ──
         Column {
             id: buttons
             visible: !fullView.minimal
@@ -273,35 +438,14 @@ PlasmoidItem {
 
                 PlasmaComponents.Button {
                     width: (buttons.width - 5) / 2
-                    text: "Claude CLI"
-                    icon.name: "utilities-terminal"
-                    font.pixelSize: 10
-                    onClicked: {
-                        var term = Plasmoid.configuration.terminalApp.trim() || "konsole"
-                        var cmd
-                        if (term === "konsole")
-                            cmd = "konsole --noclose -e claude"
-                        else if (term === "gnome-terminal" || term === "xfce4-terminal")
-                            cmd = term + " -- claude"
-                        else if (term === "kitty" || term === "foot" || term === "wezterm")
-                            cmd = term + " claude"
-                        else
-                            cmd = term + " -e claude"
-                        executable.connectSource(cmd)
-                        root.expanded = false
-                    }
+                    text: "Claude CLI"; icon.name: "utilities-terminal"; font.pixelSize: 10
+                    onClicked: { executable.connectSource(root.terminalCmd()); root.expanded = false }
                     PlasmaComponents.ToolTip { text: i18n("Open Claude Code in terminal") }
                 }
-
                 PlasmaComponents.Button {
                     width: (buttons.width - 5) / 2
-                    text: "VS Code"
-                    icon.name: "vscode"
-                    font.pixelSize: 10
-                    onClicked: {
-                        executable.connectSource("code --reuse-window")
-                        root.expanded = false
-                    }
+                    text: "VS Code"; icon.name: "vscode"; font.pixelSize: 10
+                    onClicked: { executable.connectSource("code --reuse-window"); root.expanded = false }
                     PlasmaComponents.ToolTip { text: i18n("Open last VS Code window") }
                 }
             }
@@ -309,16 +453,10 @@ PlasmoidItem {
             Row {
                 width: parent.width
                 visible: fullView.hasProjectShortcut
-
                 PlasmaComponents.Button {
                     width: parent.width
-                    text: Plasmoid.configuration.projectShortcutLabel
-                    icon.name: "folder-open"
-                    font.pixelSize: 10
-                    onClicked: {
-                        Qt.openUrlExternally(Plasmoid.configuration.projectShortcutUrl)
-                        root.expanded = false
-                    }
+                    text: Plasmoid.configuration.projectShortcutLabel; icon.name: "folder-open"; font.pixelSize: 10
+                    onClicked: { Qt.openUrlExternally(Plasmoid.configuration.projectShortcutUrl); root.expanded = false }
                     PlasmaComponents.ToolTip { text: Plasmoid.configuration.projectShortcutUrl }
                 }
             }
@@ -358,7 +496,7 @@ PlasmoidItem {
     function fetchData() {
         root.loading = true
         root.errorMsg = ""
-        executable.connectSource("python3 \"$HOME/Claude Arch Widget/claude_usage.py\"")
+        executable.connectSource("python3 \"$HOME/.config/claude-widget/claude_usage.py\"")
     }
 
     Timer {

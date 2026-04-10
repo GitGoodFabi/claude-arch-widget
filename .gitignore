@@ -1,10 +1,14 @@
-# Sensitive data - never commit
-*.txt
+# Sensitive data — never commit
 session*
-*cookie*
+*cookies*
 *secret*
 *token*
+*.txt
 
-# KDE cache files
+# KDE QML cache
 *.qmlc
 *.jsc
+
+# Python cache
+__pycache__/
+*.pyc
