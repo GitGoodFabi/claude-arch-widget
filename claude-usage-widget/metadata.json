@@ -8,7 +8,7 @@
         ],
         "BugReportUrl": "https://github.com/GitGoodFabi/claude-arch-widget/issues",
         "Category": "System Information",
-        "Description": "Monitor your Claude AI usage limits directly from your KDE Plasma panel or desktop. Displays session (5h rolling window) and weekly usage as live rings with color themes, notifications, and quick-launch shortcuts.",
+        "Description": "See your Claude session and weekly usage before you hit the wall. Live dual-ring widget for panel, sidebar, and desktop — with themes, shortcuts, and notifications.",
         "Icon": "claude-usage",
         "Id": "com.github.fabian.claude-usage",
         "License": "MIT",
