@@ -9,8 +9,10 @@ Kirigami.FormLayout {
     property alias cfg_colorTheme: themeCombo.currentValue
     property alias cfg_widgetOpacity: widgetOpacitySlider.value
     property alias cfg_backgroundOpacity: opacitySlider.value
+    property alias cfg_notifySession50: notifyS50.checked
     property alias cfg_notifySession80: notifyS80.checked
     property alias cfg_notifySession95: notifyS95.checked
+    property alias cfg_notifyWeekly50:  notifyW50.checked
     property alias cfg_notifyWeekly80:  notifyW80.checked
     property alias cfg_notifyWeekly95:  notifyW95.checked
     property alias cfg_terminalApp: terminalField.text
@@ -131,6 +133,7 @@ Kirigami.FormLayout {
     Row {
         Kirigami.FormData.label: i18n("Notify — Session:")
         spacing: 16
+        PlasmaComponents.CheckBox { id: notifyS50; text: "50%" }
         PlasmaComponents.CheckBox { id: notifyS80; text: "80%" }
         PlasmaComponents.CheckBox { id: notifyS95; text: "95%" }
     }
@@ -138,6 +141,7 @@ Kirigami.FormLayout {
     Row {
         Kirigami.FormData.label: i18n("Notify — Weekly:")
         spacing: 16
+        PlasmaComponents.CheckBox { id: notifyW50; text: "50%" }
         PlasmaComponents.CheckBox { id: notifyW80; text: "80%" }
         PlasmaComponents.CheckBox { id: notifyW95; text: "95%" }
     }

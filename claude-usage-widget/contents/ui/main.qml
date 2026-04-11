@@ -19,8 +19,10 @@ PlasmoidItem {
     property bool loading: true
 
     // Verhindert wiederholte Notifications bei gleichem Refresh
+    property bool _ns50: false
     property bool _ns80: false
     property bool _ns95: false
+    property bool _nw50: false
     property bool _nw80: false
     property bool _nw95: false
 
@@ -561,6 +563,13 @@ PlasmoidItem {
         var s = root.sessionPct, w = root.weeklyPct
         var si = root.sessionResetsIn, wi = root.weeklyResetsIn
 
+        // Session 50%
+        if (Plasmoid.configuration.notifySession50) {
+            if (s >= 50 && !root._ns50) {
+                root._ns50 = true
+                sendNotif("Claude — Session " + Math.round(s) + "%", "Resets in " + si)
+            } else if (s < 50) { root._ns50 = false }
+        }
         // Session 80%
         if (Plasmoid.configuration.notifySession80) {
             if (s >= 80 && !root._ns80) {
@@ -574,6 +583,13 @@ PlasmoidItem {
                 root._ns95 = true
                 sendNotif("Claude — Session " + Math.round(s) + "%", "Resets in " + si)
             } else if (s < 95) { root._ns95 = false }
+        }
+        // Weekly 50%
+        if (Plasmoid.configuration.notifyWeekly50) {
+            if (w >= 50 && !root._nw50) {
+                root._nw50 = true
+                sendNotif("Claude — Weekly " + Math.round(w) + "%", "Resets in " + wi)
+            } else if (w < 50) { root._nw50 = false }
         }
         // Weekly 80%
         if (Plasmoid.configuration.notifyWeekly80) {
