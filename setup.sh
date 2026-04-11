@@ -22,6 +22,24 @@ echo -e "\n${CYAN}${BOLD}╔═════════════════�
 echo -e "║    Claude Usage Widget  —  Setup    ║"
 echo -e "╚══════════════════════════════════════╝${NC}"
 
+# ── 0. Dependency checks ──────────────────────────────────────────────────────
+step "Checking dependencies..."
+MISSING=0
+for cmd in python3 notify-send; do
+    if command -v "$cmd" &>/dev/null; then
+        ok "$cmd found"
+    else
+        err "$cmd not found"
+        MISSING=1
+    fi
+done
+if [ "$MISSING" = "1" ]; then
+    echo ""
+    warn "Install missing dependencies before continuing."
+    warn "  notify-send is provided by: libnotify (Arch: pacman -S libnotify)"
+    exit 1
+fi
+
 # ── 1. Config directory ───────────────────────────────────────────────────────
 step "Creating config directory..."
 mkdir -p "$CONFIG_DIR"

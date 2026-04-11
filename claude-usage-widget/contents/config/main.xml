@@ -5,6 +5,9 @@
     <entry name="backgroundOpacity" type="Double">
       <default>0.0</default>
     </entry>
+    <entry name="scriptPath" type="String">
+      <default></default>
+    </entry>
     <entry name="terminalApp" type="String">
       <default>konsole</default>
     </entry>

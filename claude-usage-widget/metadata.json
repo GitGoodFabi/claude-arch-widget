@@ -2,17 +2,19 @@
     "KPlugin": {
         "Authors": [
             {
-                "Email": "",
+                "Email": "contact@gitgoodfabi.dev",
                 "Name": "Fabian Schott"
             }
         ],
+        "BugReportUrl": "https://github.com/GitGoodFabi/claude-arch-widget/issues",
         "Category": "System Information",
-        "Description": "Shows Claude Pro session and weekly usage limits",
-        "Icon": "brain",
+        "Description": "Monitor your Claude AI usage limits directly from your KDE Plasma panel or desktop. Displays session (5h rolling window) and weekly usage as live rings with color themes, notifications, and quick-launch shortcuts.",
+        "Icon": "claude-usage",
         "Id": "com.github.fabian.claude-usage",
         "License": "MIT",
-        "Name": "Claude Usage",
-        "Version": "1.1",
+        "Name": "Claude Usage Monitor",
+        "Tags": ["claude", "ai", "usage", "monitor", "anthropic", "api"],
+        "Version": "1.2",
         "Website": "https://github.com/GitGoodFabi/claude-arch-widget"
     },
     "X-Plasma-API-Minimum-Version": "6.0",

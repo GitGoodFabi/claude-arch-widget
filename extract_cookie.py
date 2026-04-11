@@ -32,7 +32,8 @@ def get_firefox():
         for db_path in glob.glob(os.path.expanduser(pattern)):
             try:
                 # Copy first — Firefox may have the DB locked
-                tmp = tempfile.mktemp(suffix=".sqlite")
+                fd, tmp = tempfile.mkstemp(suffix=".sqlite")
+                os.close(fd)
                 shutil.copy2(db_path, tmp)
                 conn = sqlite3.connect(tmp)
                 row = conn.execute(
@@ -122,7 +123,8 @@ def get_chromium():
             continue
         info(f"Checking {name}...")
         try:
-            tmp = tempfile.mktemp(suffix=".sqlite")
+            fd, tmp = tempfile.mkstemp(suffix=".sqlite")
+            os.close(fd)
             shutil.copy2(db_path, tmp)
             conn = sqlite3.connect(tmp)
             rows = conn.execute(

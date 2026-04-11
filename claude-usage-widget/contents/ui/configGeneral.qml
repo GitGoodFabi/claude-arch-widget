@@ -12,6 +12,7 @@ Kirigami.FormLayout {
     property string cfg_customWeeklyColor:  "#FFB347"
     property alias cfg_widgetOpacity:       widgetOpacitySlider.value
     property alias cfg_backgroundOpacity:   opacitySlider.value
+    property alias cfg_scriptPath:           scriptPathField.text
     property alias cfg_terminalApp:         terminalField.text
     property alias cfg_timerEnabled:        timerToggle.checked
     property alias cfg_refreshIntervalSeconds: intervalCombo.currentValue
@@ -102,6 +103,13 @@ Kirigami.FormLayout {
         Kirigami.FormData.label: i18n("Background opacity:")
         from: 0.0; to: 1.0; stepSize: 0.05
         PlasmaComponents.ToolTip { text: Math.round(opacitySlider.value * 100) + "%" }
+    }
+
+    // ── Script path ───────────────────────────────────────────────────────
+    PlasmaComponents.TextField {
+        id: scriptPathField
+        Kirigami.FormData.label: i18n("Script path:")
+        placeholderText: i18n("Default: ~/.config/claude-widget/claude_usage.py")
     }
 
     // ── Terminal ─────────────────────────────────────────────────────────

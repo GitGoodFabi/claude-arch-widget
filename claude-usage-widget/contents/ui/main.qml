@@ -17,8 +17,10 @@ PlasmoidItem {
     property string weeklyResetsAt: ""
     property string errorMsg: ""
     property bool loading: true
+    property bool isAuthError: false
 
-    // Verhindert wiederholte Notifications bei gleichem Refresh
+    // Notification flags — reset on first load to avoid re-firing on plasmashell restart
+    property bool _firstLoad: true
     property bool _ns25: false
     property bool _ns50: false
     property bool _ns80: false
@@ -30,7 +32,7 @@ PlasmoidItem {
 
     readonly property bool onDesktop: Plasmoid.formFactor === PlasmaCore.Types.Planar
 
-    // ── Farbthemen ────────────────────────────────────────────────────────────
+    // ── Color themes ──────────────────────────────────────────────────────────
     function makeThemeColors(s, w) {
         var sc = Qt.color(s), wc = Qt.color(w)
         return {
@@ -107,7 +109,7 @@ PlasmoidItem {
 
     function terminalCmd() {
         var term = Plasmoid.configuration.terminalApp.trim() || "konsole"
-        // Login-Shell (-l) damit ~/.local/bin im PATH ist; exec bash hält Terminal offen
+        // Login shell (-l) so ~/.local/bin is in PATH; exec bash keeps the terminal open
         if (term === "konsole")
             return "konsole --noclose -e bash -lc 'claude; exec bash'"
         if (term === "gnome-terminal" || term === "xfce4-terminal")
@@ -119,18 +121,18 @@ PlasmoidItem {
         return term + " -e bash -lc 'claude; exec bash'"
     }
 
-    // ── Compact (Panel + Sidebar) ─────────────────────────────────────────
+    // ── Compact (Panel + Sidebar) ─────────────────────────────────────────────
     compactRepresentation: Item {
         id: compact
         opacity: Plasmoid.configuration.widgetOpacity
 
         readonly property bool vertical: Plasmoid.formFactor === PlasmaCore.Types.Vertical
 
-        // h = kurze Seite des Panels (Höhe horizontal, Breite vertikal)
-        readonly property real h:       vertical ? parent.width : parent.height
+        // h = short side of the panel (height when horizontal, width when vertical)
+        readonly property real h:        vertical ? parent.width : parent.height
         readonly property real iconSize: Math.round(h * 0.84)
-        readonly property real textW:   Math.round(h * 1.6)
-        readonly property real totalW:  iconSize + textW + Math.round(h * 0.25)
+        readonly property real textW:    Math.round(h * 1.6)
+        readonly property real totalW:   iconSize + textW + Math.round(h * 0.25)
 
         Layout.minimumWidth:   vertical ? parent.width : totalW
         Layout.preferredWidth: vertical ? parent.width : totalW
@@ -140,13 +142,13 @@ PlasmoidItem {
 
         MouseArea { anchors.fill: parent; onClicked: root.expanded = !root.expanded }
 
-        // ── Ring-Canvas ───────────────────────────────────────────────────
+        // ── Ring canvas ───────────────────────────────────────────────────────
         Canvas {
             id: compactCanvas
             width:  compact.iconSize
             height: compact.iconSize
 
-            // Sidebar: oben zentriert; Horizontal: links, zentriert
+            // Sidebar: centered at top; Horizontal: left-aligned, vertically centered
             anchors.horizontalCenter: compact.vertical ? parent.horizontalCenter : undefined
             anchors.verticalCenter:   compact.vertical ? undefined               : parent.verticalCenter
             anchors.top:              compact.vertical ? parent.top              : undefined
@@ -181,7 +183,7 @@ PlasmoidItem {
             }
             onWidthChanged: requestPaint()
 
-            // Sidebar: alle 4 Werte in die Ringmitte (FixedHeight = kein Standard-Leading)
+            // Sidebar: all 4 values centered inside the ring (FixedHeight avoids default leading)
             Column {
                 visible: compact.vertical
                 anchors.centerIn: parent
@@ -231,7 +233,7 @@ PlasmoidItem {
             }
         }
 
-        // Horizontal-Panel: Text rechts neben dem Ring
+        // Horizontal panel: text to the right of the ring
         Column {
             visible: !compact.vertical
             anchors.verticalCenter: parent.verticalCenter
@@ -254,7 +256,7 @@ PlasmoidItem {
             }
         }
 
-        // Sidebar-Shortcuts — gleiches Schema wie Desktop-Popup
+        // Sidebar shortcuts — same layout as desktop popup
         Column {
             visible: compact.vertical && Plasmoid.configuration.sidebarShortcuts
             anchors.horizontalCenter: parent.horizontalCenter
@@ -289,7 +291,7 @@ PlasmoidItem {
         }
     }
 
-    // ── Full (Desktop & Popup) ────────────────────────────────────────────
+    // ── Full (Desktop & Popup) ────────────────────────────────────────────────
     fullRepresentation: Item {
         id: fullView
         opacity: Plasmoid.configuration.widgetOpacity
@@ -320,7 +322,7 @@ PlasmoidItem {
             opacity: Plasmoid.configuration.backgroundOpacity
         }
 
-        // ── Header (nur full) ──
+        // ── Header (full view only) ──
         Item {
             id: header
             visible: !fullView.minimal
@@ -329,7 +331,7 @@ PlasmoidItem {
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Claude Pro"
+                text: "Claude"
                 color: "white"; font.bold: true
                 font.pixelSize: Math.max(13, fullView.ringDiam * 0.09)
             }
@@ -342,15 +344,37 @@ PlasmoidItem {
             }
         }
 
-        // ── Fehler ──
-        Text {
+        // ── Error display ──
+        Column {
             visible: root.errorMsg !== ""
             anchors { top: header.bottom; left: parent.left; right: parent.right; margins: fullView.pad }
-            text: root.errorMsg; color: "#ff5555"; wrapMode: Text.Wrap
-            font.pixelSize: Math.max(10, fullView.ringDiam * 0.07)
+            spacing: 8
+
+            Text {
+                width: parent.width
+                text: root.isAuthError
+                    ? i18n("Session key missing or expired.")
+                    : root.errorMsg
+                color: "#ff5555"; wrapMode: Text.Wrap
+                font.pixelSize: Math.max(10, fullView.ringDiam * 0.07)
+            }
+            Text {
+                visible: root.isAuthError
+                width: parent.width
+                text: i18n("Run setup.sh from the widget repository, or paste your sessionKey from claude.ai cookies.")
+                color: Qt.rgba(1,1,1,0.5); wrapMode: Text.Wrap
+                font.pixelSize: Math.max(9, fullView.ringDiam * 0.06)
+            }
+            PlasmaComponents.Button {
+                visible: root.isAuthError
+                text: i18n("Open Setup Guide")
+                icon.name: "help-contents"
+                font.pixelSize: 10
+                onClicked: Qt.openUrlExternally("https://github.com/GitGoodFabi/claude-arch-widget#installation")
+            }
         }
 
-        // ── Ringe ──
+        // ── Rings ──
         Canvas {
             id: ringCanvas
             visible: root.errorMsg === ""
@@ -384,7 +408,7 @@ PlasmoidItem {
             }
             onWidthChanged: requestPaint()
 
-            // Text in Ringmitte — sauber für beide Ansichten
+            // Text centered in the ring — works cleanly for both minimal and full views
             Column {
                 anchors.centerIn: parent
                 spacing: 2
@@ -407,7 +431,7 @@ PlasmoidItem {
             }
         }
 
-        // Minimal-View: Klick auf Ring öffnet Shortcut-Popup
+        // Minimal view: clicking the ring opens the shortcut popup
         MouseArea {
             anchors.fill: ringCanvas
             visible: fullView.minimal
@@ -454,7 +478,7 @@ PlasmoidItem {
             }
         }
 
-        // ── Legende (full view only) ──
+        // ── Legend (full view only) ──
         Column {
             id: legend
             visible: root.errorMsg === "" && !fullView.minimal
@@ -468,7 +492,7 @@ PlasmoidItem {
             Row {
                 width: parent.width; spacing: 6
                 Rectangle { width:8; height:8; radius:4; color:root.theme.s; anchors.verticalCenter: parent.verticalCenter }
-                Text { text: i18n("Session"); color:"white"; font.pixelSize:11; width:55 }
+                Text { text: i18n("Session (5h)"); color:"white"; font.pixelSize:11; width:68 }
                 Text { text:Math.round(root.sessionPct)+"%"; color:root.theme.s; font.pixelSize:11; font.bold:true; width:34 }
                 Text { text:"↻ "+root.sessionResetsIn; color:Qt.rgba(1,1,1,0.4); font.pixelSize:10; anchors.verticalCenter:parent.verticalCenter }
             }
@@ -481,7 +505,7 @@ PlasmoidItem {
             Row {
                 width: parent.width; spacing: 6
                 Rectangle { width:8; height:8; radius:4; color:root.theme.w; anchors.verticalCenter:parent.verticalCenter }
-                Text { text: i18n("Week"); color:"white"; font.pixelSize:11; width:55 }
+                Text { text: i18n("Week"); color:"white"; font.pixelSize:11; width:68 }
                 Text { text:Math.round(root.weeklyPct)+"%"; color:root.theme.w; font.pixelSize:11; font.bold:true; width:34 }
                 Text { text:"↻ "+root.weeklyResetsIn; color:Qt.rgba(1,1,1,0.4); font.pixelSize:10; anchors.verticalCenter:parent.verticalCenter }
             }
@@ -495,7 +519,7 @@ PlasmoidItem {
             }
         }
 
-        // ── Schnelllinks (full view only) ──
+        // ── Quick links (full view only) ──
         Column {
             id: buttons
             visible: !fullView.minimal && Plasmoid.configuration.desktopShortcuts
@@ -549,7 +573,7 @@ PlasmoidItem {
         }
     }
 
-    // ── Datenabruf ────────────────────────────────────────────────────────
+    // ── Data fetching ─────────────────────────────────────────────────────────
     Plasma5Support.DataSource {
         id: executable
         engine: "executable"
@@ -557,15 +581,25 @@ PlasmoidItem {
         onNewData: function(source, data) {
             disconnectSource(source)
             var out = (data["stdout"] || "").trim()
-            if (!out.startsWith("{")) return
+            // Always clear loading state first, even on failure
             root.loading = false
+            if (!out.startsWith("{")) {
+                root.errorMsg = (data["stderr"] || i18n("Script failed")).trim()
+                return
+            }
             if (data["exit code"] !== 0) {
-                root.errorMsg = (data["stderr"] || "Script fehlgeschlagen").trim()
+                root.errorMsg = (data["stderr"] || i18n("Script failed")).trim()
                 return
             }
             try {
                 var j = JSON.parse(out)
-                if (j.error) { root.errorMsg = j.error; return }
+                if (j.error) {
+                    root.errorMsg = j.error
+                    root.isAuthError = j.error.toLowerCase().indexOf("session key") !== -1
+                        || j.error.indexOf("401") !== -1
+                        || j.error.indexOf("403") !== -1
+                    return
+                }
                 root.errorMsg        = ""
                 root.sessionPct      = j.session.utilization
                 root.sessionResetsIn = j.session.resets_in
@@ -575,81 +609,83 @@ PlasmoidItem {
                 root.weeklyResetsAt  = j.weekly.resets_at
                 checkNotifications()
             } catch(e) {
-                root.errorMsg = "Parse-Fehler: " + e
+                root.errorMsg = i18n("Parse error: %1", e)
             }
         }
     }
 
+    // Escape single quotes for use inside single-quoted shell arguments
+    function escapeShellArg(s) {
+        return s.replace(/'/g, "'\\''")
+    }
+
     function sendNotif(title, body) {
-        executable.connectSource("notify-send -i dialog-warning -t 10000 '" + title + "' '" + body + "'")
+        executable.connectSource(
+            "notify-send -i dialog-warning -t 10000 '" +
+            escapeShellArg(title) + "' '" + escapeShellArg(body) + "'"
+        )
     }
 
     function checkNotifications() {
         var s = root.sessionPct, w = root.weeklyPct
         var si = root.sessionResetsIn, wi = root.weeklyResetsIn
 
-        // Session 25%
+        // On first load, silently mark already-crossed thresholds as seen.
+        // This prevents a flood of notifications every time plasmashell restarts.
+        if (root._firstLoad) {
+            root._ns25 = s >= 25; root._ns50 = s >= 50
+            root._ns80 = s >= 80; root._ns95 = s >= 95
+            root._nw25 = w >= 25; root._nw50 = w >= 50
+            root._nw80 = w >= 80; root._nw95 = w >= 95
+            root._firstLoad = false
+            return
+        }
+
         if (Plasmoid.configuration.notifySession25) {
-            if (s >= 25 && !root._ns25) {
-                root._ns25 = true
-                sendNotif("Claude — Session " + Math.round(s) + "%", "Resets in " + si)
-            } else if (s < 25) { root._ns25 = false }
+            if (s >= 25 && !root._ns25) { root._ns25 = true; sendNotif("Claude — Session " + Math.round(s) + "%", i18n("Resets in %1", si)) }
+            else if (s < 25) { root._ns25 = false }
         }
-        // Session 50%
         if (Plasmoid.configuration.notifySession50) {
-            if (s >= 50 && !root._ns50) {
-                root._ns50 = true
-                sendNotif("Claude — Session " + Math.round(s) + "%", "Resets in " + si)
-            } else if (s < 50) { root._ns50 = false }
+            if (s >= 50 && !root._ns50) { root._ns50 = true; sendNotif("Claude — Session " + Math.round(s) + "%", i18n("Resets in %1", si)) }
+            else if (s < 50) { root._ns50 = false }
         }
-        // Session 80%
         if (Plasmoid.configuration.notifySession80) {
-            if (s >= 80 && !root._ns80) {
-                root._ns80 = true
-                sendNotif("Claude — Session " + Math.round(s) + "%", "Resets in " + si)
-            } else if (s < 80) { root._ns80 = false }
+            if (s >= 80 && !root._ns80) { root._ns80 = true; sendNotif("Claude — Session " + Math.round(s) + "%", i18n("Resets in %1", si)) }
+            else if (s < 80) { root._ns80 = false }
         }
-        // Session 95%
         if (Plasmoid.configuration.notifySession95) {
-            if (s >= 95 && !root._ns95) {
-                root._ns95 = true
-                sendNotif("Claude — Session " + Math.round(s) + "%", "Resets in " + si)
-            } else if (s < 95) { root._ns95 = false }
+            if (s >= 95 && !root._ns95) { root._ns95 = true; sendNotif("Claude — Session " + Math.round(s) + "%", i18n("Resets in %1", si)) }
+            else if (s < 95) { root._ns95 = false }
         }
-        // Weekly 25%
         if (Plasmoid.configuration.notifyWeekly25) {
-            if (w >= 25 && !root._nw25) {
-                root._nw25 = true
-                sendNotif("Claude — Weekly " + Math.round(w) + "%", "Resets in " + wi)
-            } else if (w < 25) { root._nw25 = false }
+            if (w >= 25 && !root._nw25) { root._nw25 = true; sendNotif("Claude — Weekly " + Math.round(w) + "%", i18n("Resets in %1", wi)) }
+            else if (w < 25) { root._nw25 = false }
         }
-        // Weekly 50%
         if (Plasmoid.configuration.notifyWeekly50) {
-            if (w >= 50 && !root._nw50) {
-                root._nw50 = true
-                sendNotif("Claude — Weekly " + Math.round(w) + "%", "Resets in " + wi)
-            } else if (w < 50) { root._nw50 = false }
+            if (w >= 50 && !root._nw50) { root._nw50 = true; sendNotif("Claude — Weekly " + Math.round(w) + "%", i18n("Resets in %1", wi)) }
+            else if (w < 50) { root._nw50 = false }
         }
-        // Weekly 80%
         if (Plasmoid.configuration.notifyWeekly80) {
-            if (w >= 80 && !root._nw80) {
-                root._nw80 = true
-                sendNotif("Claude — Weekly " + Math.round(w) + "%", "Resets in " + wi)
-            } else if (w < 80) { root._nw80 = false }
+            if (w >= 80 && !root._nw80) { root._nw80 = true; sendNotif("Claude — Weekly " + Math.round(w) + "%", i18n("Resets in %1", wi)) }
+            else if (w < 80) { root._nw80 = false }
         }
-        // Weekly 95%
         if (Plasmoid.configuration.notifyWeekly95) {
-            if (w >= 95 && !root._nw95) {
-                root._nw95 = true
-                sendNotif("Claude — Weekly " + Math.round(w) + "%", "Resets in " + wi)
-            } else if (w < 95) { root._nw95 = false }
+            if (w >= 95 && !root._nw95) { root._nw95 = true; sendNotif("Claude — Weekly " + Math.round(w) + "%", i18n("Resets in %1", wi)) }
+            else if (w < 95) { root._nw95 = false }
         }
     }
 
     function fetchData() {
         root.loading = true
         root.errorMsg = ""
-        executable.connectSource("python3 \"$HOME/.config/claude-widget/claude_usage.py\"")
+        root.isAuthError = false
+        var path = (Plasmoid.configuration.scriptPath || "").trim()
+        if (!path) {
+            // Use the script bundled inside the plasmoid — works after Discover install
+            // without any separate setup step (session key is still required)
+            path = Qt.resolvedUrl("../code/claude_usage.py").toString().replace("file://", "")
+        }
+        executable.connectSource("python3 \"" + path + "\"")
     }
 
     Timer {
