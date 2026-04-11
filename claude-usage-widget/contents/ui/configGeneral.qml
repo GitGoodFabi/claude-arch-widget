@@ -10,21 +10,24 @@ Kirigami.FormLayout {
     property alias cfg_colorTheme: themeCombo.currentValue
     property string cfg_customSessionColor: "#FF7300"
     property string cfg_customWeeklyColor:  "#FFB347"
-    property alias cfg_widgetOpacity: widgetOpacitySlider.value
-    property alias cfg_backgroundOpacity: opacitySlider.value
+    property alias cfg_widgetOpacity:       widgetOpacitySlider.value
+    property alias cfg_backgroundOpacity:   opacitySlider.value
+    property alias cfg_terminalApp:         terminalField.text
+    property alias cfg_timerEnabled:        timerToggle.checked
+    property alias cfg_refreshIntervalSeconds: intervalCombo.currentValue
+    property alias cfg_projectShortcutLabel: projectLabelField.text
+    property alias cfg_projectShortcutUrl:   projectUrlField.text
+    property alias cfg_minimalView:          minimalToggle.checked
+    property alias cfg_sidebarShortcuts:     sidebarShortcutsToggle.checked
+    property alias cfg_desktopShortcuts:     desktopShortcutsToggle.checked
+    property alias cfg_notifySession25: notifyS25.checked
     property alias cfg_notifySession50: notifyS50.checked
     property alias cfg_notifySession80: notifyS80.checked
     property alias cfg_notifySession95: notifyS95.checked
+    property alias cfg_notifyWeekly25:  notifyW25.checked
     property alias cfg_notifyWeekly50:  notifyW50.checked
     property alias cfg_notifyWeekly80:  notifyW80.checked
     property alias cfg_notifyWeekly95:  notifyW95.checked
-    property alias cfg_terminalApp: terminalField.text
-    property alias cfg_timerEnabled: timerToggle.checked
-    property alias cfg_refreshIntervalSeconds: intervalCombo.currentValue
-    property alias cfg_projectShortcutLabel: projectLabelField.text
-    property alias cfg_projectShortcutUrl: projectUrlField.text
-    property alias cfg_minimalView: minimalToggle.checked
-    property alias cfg_sidebarShortcuts: sidebarShortcutsToggle.checked
 
     // ── Farbthema ─────────────────────────────────────────────────────────
     PlasmaComponents.ComboBox {
@@ -44,9 +47,7 @@ Kirigami.FormLayout {
         ]
         Component.onCompleted: {
             for (var i = 0; i < model.length; i++) {
-                if (model[i].value === cfg_colorTheme) {
-                    currentIndex = i; break
-                }
+                if (model[i].value === cfg_colorTheme) { currentIndex = i; break }
             }
         }
     }
@@ -77,6 +78,12 @@ Kirigami.FormLayout {
     }
 
     PlasmaComponents.CheckBox {
+        id: desktopShortcutsToggle
+        Kirigami.FormData.label: i18n("Desktop shortcuts:")
+        text: i18n("Show below rings")
+    }
+
+    PlasmaComponents.CheckBox {
         id: sidebarShortcutsToggle
         Kirigami.FormData.label: i18n("Sidebar shortcuts:")
         text: i18n("Show below rings")
@@ -87,18 +94,14 @@ Kirigami.FormLayout {
         id: widgetOpacitySlider
         Kirigami.FormData.label: i18n("Widget opacity:")
         from: 0.1; to: 1.0; stepSize: 0.05
-        PlasmaComponents.ToolTip {
-            text: Math.round(widgetOpacitySlider.value * 100) + "%"
-        }
+        PlasmaComponents.ToolTip { text: Math.round(widgetOpacitySlider.value * 100) + "%" }
     }
 
     PlasmaComponents.Slider {
         id: opacitySlider
         Kirigami.FormData.label: i18n("Background opacity:")
         from: 0.0; to: 1.0; stepSize: 0.05
-        PlasmaComponents.ToolTip {
-            text: Math.round(opacitySlider.value * 100) + "%"
-        }
+        PlasmaComponents.ToolTip { text: Math.round(opacitySlider.value * 100) + "%" }
     }
 
     // ── Terminal ─────────────────────────────────────────────────────────
@@ -130,10 +133,7 @@ Kirigami.FormLayout {
         ]
         Component.onCompleted: {
             for (var i = 0; i < model.length; i++) {
-                if (model[i].value === cfg_refreshIntervalSeconds) {
-                    currentIndex = i
-                    break
-                }
+                if (model[i].value === cfg_refreshIntervalSeconds) { currentIndex = i; break }
             }
         }
     }
@@ -152,17 +152,37 @@ Kirigami.FormLayout {
     }
 
     // ── Benachrichtigungen ────────────────────────────────────────────────
+    PlasmaComponents.CheckBox {
+        id: notifyAllToggle
+        Kirigami.FormData.label: i18n("Notifications:")
+        text: i18n("All")
+        tristate: true
+        checkState: {
+            var all = [notifyS25, notifyS50, notifyS80, notifyS95,
+                       notifyW25, notifyW50, notifyW80, notifyW95]
+            var on = all.filter(function(c){ return c.checked }).length
+            return on === 0 ? Qt.Unchecked : on === all.length ? Qt.Checked : Qt.PartiallyChecked
+        }
+        onClicked: {
+            var val = (checkState !== Qt.Checked)
+            notifyS25.checked = notifyS50.checked = notifyS80.checked = notifyS95.checked = val
+            notifyW25.checked = notifyW50.checked = notifyW80.checked = notifyW95.checked = val
+        }
+    }
+
     Row {
-        Kirigami.FormData.label: i18n("Notify — Session:")
-        spacing: 16
+        Kirigami.FormData.label: i18n("Session:")
+        spacing: 12
+        PlasmaComponents.CheckBox { id: notifyS25; text: "25%" }
         PlasmaComponents.CheckBox { id: notifyS50; text: "50%" }
         PlasmaComponents.CheckBox { id: notifyS80; text: "80%" }
         PlasmaComponents.CheckBox { id: notifyS95; text: "95%" }
     }
 
     Row {
-        Kirigami.FormData.label: i18n("Notify — Weekly:")
-        spacing: 16
+        Kirigami.FormData.label: i18n("Weekly:")
+        spacing: 12
+        PlasmaComponents.CheckBox { id: notifyW25; text: "25%" }
         PlasmaComponents.CheckBox { id: notifyW50; text: "50%" }
         PlasmaComponents.CheckBox { id: notifyW80; text: "80%" }
         PlasmaComponents.CheckBox { id: notifyW95; text: "95%" }

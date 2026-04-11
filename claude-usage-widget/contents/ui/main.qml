@@ -19,9 +19,11 @@ PlasmoidItem {
     property bool loading: true
 
     // Verhindert wiederholte Notifications bei gleichem Refresh
+    property bool _ns25: false
     property bool _ns50: false
     property bool _ns80: false
     property bool _ns95: false
+    property bool _nw25: false
     property bool _nw50: false
     property bool _nw80: false
     property bool _nw95: false
@@ -252,7 +254,7 @@ PlasmoidItem {
             }
         }
 
-        // Sidebar-Shortcuts (optional, Icon-Buttons unter dem Ring)
+        // Sidebar-Shortcuts — gleiches Schema wie Desktop-Popup
         Column {
             visible: compact.vertical && Plasmoid.configuration.sidebarShortcuts
             anchors.horizontalCenter: parent.horizontalCenter
@@ -263,18 +265,24 @@ PlasmoidItem {
             Repeater {
                 model: {
                     var items = [
-                        { icon: "list-add",                 url: "https://claude.ai/new",            tip: i18n("New Chat") },
-                        { icon: "utilities-system-monitor", url: "https://claude.ai/settings/usage", tip: i18n("Usage")    }
+                        { icon: "list-add",                 tip: i18n("New Chat"), url: "https://claude.ai/new"            },
+                        { icon: "folder",                   tip: i18n("Projects"), url: "https://claude.ai/projects"       },
+                        { icon: "utilities-system-monitor", tip: i18n("Usage"),    url: "https://claude.ai/settings/usage" },
+                        { icon: "utilities-terminal",       tip: "Claude CLI",     cmd: root.terminalCmd()                 },
+                        { icon: "vscode",                   tip: "VS Code",        cmd: "code --reuse-window"              }
                     ]
                     if (Plasmoid.configuration.projectShortcutLabel !== "" && Plasmoid.configuration.projectShortcutUrl !== "")
-                        items.push({ icon: "folder-open", url: Plasmoid.configuration.projectShortcutUrl, tip: Plasmoid.configuration.projectShortcutLabel })
+                        items.push({ icon: "folder-open", tip: Plasmoid.configuration.projectShortcutLabel, url: Plasmoid.configuration.projectShortcutUrl })
                     return items
                 }
                 PlasmaComponents.ToolButton {
                     width:  Math.round(compact.h * 0.55)
                     height: Math.round(compact.h * 0.55)
                     icon.name: modelData.icon
-                    onClicked: Qt.openUrlExternally(modelData.url)
+                    onClicked: {
+                        if (modelData.cmd) executable.connectSource(modelData.cmd)
+                        else Qt.openUrlExternally(modelData.url)
+                    }
                     PlasmaComponents.ToolTip { text: modelData.tip }
                 }
             }
@@ -490,7 +498,7 @@ PlasmoidItem {
         // ── Schnelllinks (full view only) ──
         Column {
             id: buttons
-            visible: !fullView.minimal
+            visible: !fullView.minimal && Plasmoid.configuration.desktopShortcuts
             anchors { bottom: parent.bottom; left: parent.left; right: parent.right
                       margins: fullView.pad; bottomMargin: fullView.pad }
             spacing: 5
@@ -580,6 +588,13 @@ PlasmoidItem {
         var s = root.sessionPct, w = root.weeklyPct
         var si = root.sessionResetsIn, wi = root.weeklyResetsIn
 
+        // Session 25%
+        if (Plasmoid.configuration.notifySession25) {
+            if (s >= 25 && !root._ns25) {
+                root._ns25 = true
+                sendNotif("Claude — Session " + Math.round(s) + "%", "Resets in " + si)
+            } else if (s < 25) { root._ns25 = false }
+        }
         // Session 50%
         if (Plasmoid.configuration.notifySession50) {
             if (s >= 50 && !root._ns50) {
@@ -600,6 +615,13 @@ PlasmoidItem {
                 root._ns95 = true
                 sendNotif("Claude — Session " + Math.round(s) + "%", "Resets in " + si)
             } else if (s < 95) { root._ns95 = false }
+        }
+        // Weekly 25%
+        if (Plasmoid.configuration.notifyWeekly25) {
+            if (w >= 25 && !root._nw25) {
+                root._nw25 = true
+                sendNotif("Claude — Weekly " + Math.round(w) + "%", "Resets in " + wi)
+            } else if (w < 25) { root._nw25 = false }
         }
         // Weekly 50%
         if (Plasmoid.configuration.notifyWeekly50) {
