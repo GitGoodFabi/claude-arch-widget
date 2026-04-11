@@ -29,6 +29,12 @@
     <entry name="colorTheme" type="String">
       <default>amber</default>
     </entry>
+    <entry name="customSessionColor" type="String">
+      <default>#FF7300</default>
+    </entry>
+    <entry name="customWeeklyColor" type="String">
+      <default>#FFB347</default>
+    </entry>
     <entry name="widgetOpacity" type="Double">
       <default>1.0</default>
     </entry>

@@ -29,8 +29,25 @@ PlasmoidItem {
     readonly property bool onDesktop: Plasmoid.formFactor === PlasmaCore.Types.Planar
 
     // ── Farbthemen ────────────────────────────────────────────────────────────
+    function makeThemeColors(s, w) {
+        var sc = Qt.color(s), wc = Qt.color(w)
+        return {
+            s: s, w: w,
+            sT:   Qt.rgba(sc.r, sc.g, sc.b, 0.18),
+            wT:   Qt.rgba(wc.r, wc.g, wc.b, 0.18),
+            sDim: Qt.rgba(sc.r, sc.g, sc.b, 0.6),
+            wDim: Qt.rgba(wc.r, wc.g, wc.b, 0.6),
+            sLbl: Qt.rgba(sc.r, sc.g, sc.b, 0.5)
+        }
+    }
+
     readonly property var theme: {
         var key = Plasmoid.configuration.colorTheme || "amber"
+        if (key === "custom")
+            return makeThemeColors(
+                Plasmoid.configuration.customSessionColor || "#FF7300",
+                Plasmoid.configuration.customWeeklyColor  || "#FFB347"
+            )
         var map = {
             "amber": {
                 s: "#FF7300",              w: "#FFB347",

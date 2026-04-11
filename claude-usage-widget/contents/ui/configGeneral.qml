@@ -2,11 +2,14 @@ import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
+import org.kde.kquickcontrols as KQuickControls
 
 Kirigami.FormLayout {
     id: configPage
 
     property alias cfg_colorTheme: themeCombo.currentValue
+    property string cfg_customSessionColor: "#FF7300"
+    property string cfg_customWeeklyColor:  "#FFB347"
     property alias cfg_widgetOpacity: widgetOpacitySlider.value
     property alias cfg_backgroundOpacity: opacitySlider.value
     property alias cfg_notifySession50: notifyS50.checked
@@ -36,7 +39,8 @@ Kirigami.FormLayout {
             { label: "Violet",         value: "violet"  },
             { label: "Liquid Glass",   value: "glass"   },
             { label: "Emerald",        value: "emerald" },
-            { label: "Rose",           value: "rose"    }
+            { label: "Rose",           value: "rose"    },
+            { label: i18n("Custom…"),  value: "custom"  }
         ]
         Component.onCompleted: {
             for (var i = 0; i < model.length; i++) {
@@ -45,6 +49,24 @@ Kirigami.FormLayout {
                 }
             }
         }
+    }
+
+    KQuickControls.ColorButton {
+        id: sessionColorBtn
+        Kirigami.FormData.label: i18n("Session color:")
+        visible: themeCombo.currentValue === "custom"
+        showAlphaChannel: false
+        Component.onCompleted: color = configPage.cfg_customSessionColor
+        onColorChanged: configPage.cfg_customSessionColor = color.toString()
+    }
+
+    KQuickControls.ColorButton {
+        id: weeklyColorBtn
+        Kirigami.FormData.label: i18n("Weekly color:")
+        visible: themeCombo.currentValue === "custom"
+        showAlphaChannel: false
+        Component.onCompleted: color = configPage.cfg_customWeeklyColor
+        onColorChanged: configPage.cfg_customWeeklyColor = color.toString()
     }
 
     // ── Ansicht ───────────────────────────────────────────────────────────
