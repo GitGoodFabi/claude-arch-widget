@@ -9,6 +9,10 @@ Kirigami.FormLayout {
     property alias cfg_colorTheme: themeCombo.currentValue
     property alias cfg_widgetOpacity: widgetOpacitySlider.value
     property alias cfg_backgroundOpacity: opacitySlider.value
+    property alias cfg_notifySession80: notifyS80.checked
+    property alias cfg_notifySession95: notifyS95.checked
+    property alias cfg_notifyWeekly80:  notifyW80.checked
+    property alias cfg_notifyWeekly95:  notifyW95.checked
     property alias cfg_terminalApp: terminalField.text
     property alias cfg_timerEnabled: timerToggle.checked
     property alias cfg_refreshIntervalSeconds: intervalCombo.currentValue
@@ -119,5 +123,20 @@ Kirigami.FormLayout {
         id: projectUrlField
         Kirigami.FormData.label: i18n("Project URL:")
         placeholderText: "https://claude.ai/project/..."
+    }
+
+    // ── Benachrichtigungen ────────────────────────────────────────────────
+    Row {
+        Kirigami.FormData.label: i18n("Notify — Session:")
+        spacing: 16
+        PlasmaComponents.CheckBox { id: notifyS80; text: "80%" }
+        PlasmaComponents.CheckBox { id: notifyS95; text: "95%" }
+    }
+
+    Row {
+        Kirigami.FormData.label: i18n("Notify — Weekly:")
+        spacing: 16
+        PlasmaComponents.CheckBox { id: notifyW80; text: "80%" }
+        PlasmaComponents.CheckBox { id: notifyW95; text: "95%" }
     }
 }

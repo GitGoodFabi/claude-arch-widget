@@ -18,6 +18,12 @@ PlasmoidItem {
     property string errorMsg: ""
     property bool loading: true
 
+    // Verhindert wiederholte Notifications bei gleichem Refresh
+    property bool _ns80: false
+    property bool _ns95: false
+    property bool _nw80: false
+    property bool _nw95: false
+
     readonly property bool onDesktop: Plasmoid.formFactor === PlasmaCore.Types.Planar
 
     // ── Farbthemen ────────────────────────────────────────────────────────────
@@ -528,9 +534,48 @@ PlasmoidItem {
                 root.weeklyPct       = j.weekly.utilization
                 root.weeklyResetsIn  = j.weekly.resets_in
                 root.weeklyResetsAt  = j.weekly.resets_at
+                checkNotifications()
             } catch(e) {
                 root.errorMsg = "Parse-Fehler: " + e
             }
+        }
+    }
+
+    function sendNotif(title, body) {
+        executable.connectSource("notify-send -i dialog-warning -t 10000 '" + title + "' '" + body + "'")
+    }
+
+    function checkNotifications() {
+        var s = root.sessionPct, w = root.weeklyPct
+        var si = root.sessionResetsIn, wi = root.weeklyResetsIn
+
+        // Session 80%
+        if (Plasmoid.configuration.notifySession80) {
+            if (s >= 80 && !root._ns80) {
+                root._ns80 = true
+                sendNotif("Claude — Session " + Math.round(s) + "%", "Resets in " + si)
+            } else if (s < 80) { root._ns80 = false }
+        }
+        // Session 95%
+        if (Plasmoid.configuration.notifySession95) {
+            if (s >= 95 && !root._ns95) {
+                root._ns95 = true
+                sendNotif("Claude — Session " + Math.round(s) + "%", "Resets in " + si)
+            } else if (s < 95) { root._ns95 = false }
+        }
+        // Weekly 80%
+        if (Plasmoid.configuration.notifyWeekly80) {
+            if (w >= 80 && !root._nw80) {
+                root._nw80 = true
+                sendNotif("Claude — Weekly " + Math.round(w) + "%", "Resets in " + wi)
+            } else if (w < 80) { root._nw80 = false }
+        }
+        // Weekly 95%
+        if (Plasmoid.configuration.notifyWeekly95) {
+            if (w >= 95 && !root._nw95) {
+                root._nw95 = true
+                sendNotif("Claude — Weekly " + Math.round(w) + "%", "Resets in " + wi)
+            } else if (w < 95) { root._nw95 = false }
         }
     }
 

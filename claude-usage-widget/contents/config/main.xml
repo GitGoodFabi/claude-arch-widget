@@ -32,5 +32,17 @@
     <entry name="widgetOpacity" type="Double">
       <default>1.0</default>
     </entry>
+    <entry name="notifySession80" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="notifySession95" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="notifyWeekly80" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="notifyWeekly95" type="Bool">
+      <default>false</default>
+    </entry>
   </group>
 </kcfg>
