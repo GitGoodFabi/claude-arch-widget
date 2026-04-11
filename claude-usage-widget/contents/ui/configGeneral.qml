@@ -28,11 +28,13 @@ Kirigami.FormLayout {
         textRole: "label"
         valueRole: "value"
         model: [
-            { label: "Amber",         value: "amber"  },
-            { label: "Ocean",         value: "ocean"  },
-            { label: "Aurora",        value: "aurora" },
-            { label: "Violet",        value: "violet" },
-            { label: "Liquid Glass",  value: "glass"  }
+            { label: "Amber (Claude)", value: "amber"   },
+            { label: "Ocean",          value: "ocean"   },
+            { label: "Aurora",         value: "aurora"  },
+            { label: "Violet",         value: "violet"  },
+            { label: "Liquid Glass",   value: "glass"   },
+            { label: "Emerald",        value: "emerald" },
+            { label: "Rose",           value: "rose"    }
         ]
         Component.onCompleted: {
             for (var i = 0; i < model.length; i++) {
