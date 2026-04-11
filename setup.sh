@@ -115,6 +115,14 @@ mkdir -p "$PLASMOID_DST"
 cp -r "$REPO_DIR/claude-usage-widget/." "$PLASMOID_DST/"
 ok "Widget installed: $PLASMOID_DST"
 
+# ── 5b. Install icon into system icon theme ───────────────────────────────────
+step "Installing widget icon..."
+ICON_DST="$HOME/.local/share/icons/hicolor/scalable/apps"
+mkdir -p "$ICON_DST"
+cp "$REPO_DIR/claude-usage-widget/contents/icons/claude-usage.svg" "$ICON_DST/claude-usage.svg"
+kbuildsycoca6 2>/dev/null || true
+ok "Icon installed and cache rebuilt"
+
 # ── 6. Restart Plasma ─────────────────────────────────────────────────────────
 step "Restarting Plasma shell..."
 if kquitapp6 plasmashell 2>/dev/null; then
