@@ -102,6 +102,16 @@ PlasmoidItem {
 
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
 
+    Plasmoid.toolTipMainText: root.loading
+        ? i18n("Loading…")
+        : root.errorMsg
+            ? i18n("Claude — Error")
+            : "Session " + Math.round(root.sessionPct) + "%   ·   Week " + Math.round(root.weeklyPct) + "%"
+
+    Plasmoid.toolTipSubText: root.loading || root.errorMsg ? "" :
+        i18n("Session resets in %1", root.sessionResetsIn) + "\n" +
+        i18n("Weekly resets in %1", root.weeklyResetsIn)
+
     preferredRepresentation: onDesktop ? fullRepresentation : compactRepresentation
 
     Component.onCompleted: fetchData()
