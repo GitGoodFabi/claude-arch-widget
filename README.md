@@ -2,7 +2,7 @@
 
 A KDE Plasma 6 widget for Linux that shows your **Claude Pro session and weekly usage** at a glance — directly in your panel, sidebar, or on the desktop.
 
-![Widget Preview](claude-usage-widget/contents/screenshots/1.png)
+![Widget Preview](https://github.com/GitGoodFabi/claude-arch-widget/blob/main/claude-usage-widget/contents/screenshots/Standard%20Widget.png)
 
 ## Features
 
