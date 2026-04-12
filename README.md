@@ -44,7 +44,9 @@ Then: right-click your panel or desktop → **Add Widgets** → search for **Cla
 If auto-extraction fails:
 
 1. Open [claude.ai](https://claude.ai) in your browser and make sure you're logged in
-2. Open DevTools (`F12`) → **Application** tab → **Cookies** → `https://claude.ai`
+2. Open DevTools (`F12`):
+   - **Firefox:** Storage tab → Cookies → `https://claude.ai`
+   - **Chrome / Brave / Edge:** Application tab → Cookies → `https://claude.ai`
 3. Copy the value of the `sessionKey` cookie
 4. Paste it when `setup.sh` asks
 
@@ -59,7 +61,8 @@ Right-click the widget → **Configure**:
 | Option | Default | Description |
 |---|---|---|
 | View (Desktop) | off | Minimal ring-only view for desktop; click ring for shortcuts |
-| Sidebar shortcuts | on | Show shortcut icons below rings in vertical panel mode |
+| Sidebar view | Compact | **Compact** (ring + shortcuts), **Full widget** (scales to sidebar width), or **Ring only** |
+| Desktop shortcuts | on | Show quick-link buttons below rings in desktop/popup view |
 | Background opacity | 0% | Transparency of the dark background (desktop view) |
 | Terminal app | `konsole` | Used for the "Claude CLI" button (`kitty`, `alacritty`, `foot`, …) |
 | Auto-refresh | on | Enable/disable the background refresh timer |

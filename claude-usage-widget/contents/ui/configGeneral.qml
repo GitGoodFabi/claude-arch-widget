@@ -27,7 +27,7 @@ Kirigami.FormLayout {
     property alias cfg_projectShortcutLabel:  projectLabelField.text
     property alias cfg_projectShortcutUrl:    projectUrlField.text
     property alias cfg_minimalView:           minimalToggle.checked
-    property alias cfg_sidebarShortcuts:      sidebarShortcutsToggle.checked
+    property alias cfg_sidebarView:           sidebarViewCombo.currentValue
     property alias cfg_desktopShortcuts:      desktopShortcutsToggle.checked
     property alias cfg_scriptPath:            scriptPathField.text
     property alias cfg_notifySession25: notifyS25.checked
@@ -180,11 +180,22 @@ Kirigami.FormLayout {
         text: i18n("Show below rings")
     }
 
-    PlasmaComponents.CheckBox {
-        id: sidebarShortcutsToggle
+    PlasmaComponents.ComboBox {
+        id: sidebarViewCombo
         visible: !configPage.isApiMode
-        Kirigami.FormData.label: i18n("Sidebar shortcuts:")
-        text: i18n("Show below rings")
+        Kirigami.FormData.label: i18n("Sidebar view:")
+        textRole: "label"
+        valueRole: "value"
+        model: [
+            { label: i18n("Compact  (ring + shortcuts)"), value: "compact" },
+            { label: i18n("Full widget  (scales to width)"), value: "full" },
+            { label: i18n("Ring only"), value: "ring" }
+        ]
+        Component.onCompleted: {
+            for (var i = 0; i < model.length; i++) {
+                if (model[i].value === cfg_sidebarView) { currentIndex = i; break }
+            }
+        }
     }
 
     // ── Appearance ────────────────────────────────────────────────────────────

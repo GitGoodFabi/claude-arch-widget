@@ -110,7 +110,7 @@ PlasmoidItem {
         }
         return map[key] || map["amber"]
     }
-    onThemeChanged: { compactCanvas.requestPaint(); ringCanvas.requestPaint(); apiRingCanvas.requestPaint() }
+    // Theme repaints are triggered from within each canvas via their Connections blocks
 
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
 
@@ -127,7 +127,12 @@ PlasmoidItem {
                "\n" + i18n("Weekly resets in %1", root.weeklyResetsIn)
     }
 
-    preferredRepresentation: onDesktop ? fullRepresentation : compactRepresentation
+    preferredRepresentation: {
+        if (onDesktop) return fullRepresentation
+        if ((Plasmoid.configuration.sidebarView || "compact") === "full")
+            return fullRepresentation
+        return compactRepresentation
+    }
 
     Component.onCompleted: fetchData()
     onExpandedChanged: { if (expanded) fetchData() }
@@ -160,7 +165,10 @@ PlasmoidItem {
 
         Layout.minimumWidth:   vertical ? parent.width : totalW
         Layout.preferredWidth: vertical ? parent.width : totalW
-        Layout.minimumHeight:  vertical ? iconSize + Math.round(h * 0.08) : parent.height
+        Layout.minimumHeight:  vertical
+            ? iconSize + Math.round(h * 0.08)
+              + (sidebarButtons.visible ? sidebarButtons.implicitHeight + 8 : 0)
+            : parent.height
         Layout.fillHeight:     !vertical
         Layout.fillWidth:      vertical
 
@@ -209,6 +217,7 @@ PlasmoidItem {
             }
             Connections {
                 target: root
+                function onThemeChanged()        { compactCanvas.requestPaint() }
                 function onSessionPctChanged()   { compactCanvas.requestPaint() }
                 function onWeeklyPctChanged()    { compactCanvas.requestPaint() }
                 function onApiBudgetPctChanged() { compactCanvas.requestPaint() }
@@ -343,36 +352,59 @@ PlasmoidItem {
             }
         }
 
-        // ── Sidebar shortcuts (claudeai mode only) ────────────────────────────
+        // ── Sidebar shortcuts — desktop-style labeled buttons ─────────────────
         Column {
-            visible: compact.vertical && !root.apiMode && Plasmoid.configuration.sidebarShortcuts
+            id: sidebarButtons
+            visible: compact.vertical && !root.apiMode
+                     && (Plasmoid.configuration.sidebarView || "compact") === "compact"
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top:              compactCanvas.bottom
-            anchors.topMargin:        Math.round(compact.h * 0.08)
-            spacing:                  Math.round(compact.h * 0.05)
+            anchors.topMargin:        8
+            width:                    parent.width - 16
+            spacing:                  4
 
-            Repeater {
-                model: {
-                    var items = [
-                        { icon: "list-add",                 tip: i18n("New Chat"), url: "https://claude.ai/new"            },
-                        { icon: "folder",                   tip: i18n("Projects"), url: "https://claude.ai/projects"       },
-                        { icon: "utilities-system-monitor", tip: i18n("Usage"),    url: "https://claude.ai/settings/usage" },
-                        { icon: "utilities-terminal",       tip: "Claude CLI",     cmd: root.terminalCmd()                 },
-                        { icon: "vscode",                   tip: "VS Code",        cmd: "code --reuse-window"              }
+            Row {
+                width: parent.width; spacing: 4
+                Repeater {
+                    model: [
+                        { label: i18n("New Chat"), icon: "list-add",                 url: "https://claude.ai/new"            },
+                        { label: i18n("Projects"), icon: "folder",                   url: "https://claude.ai/projects"       },
+                        { label: i18n("Usage"),    icon: "utilities-system-monitor", url: "https://claude.ai/settings/usage" }
                     ]
-                    if (Plasmoid.configuration.projectShortcutLabel !== "" && Plasmoid.configuration.projectShortcutUrl !== "")
-                        items.push({ icon: "folder-open", tip: Plasmoid.configuration.projectShortcutLabel, url: Plasmoid.configuration.projectShortcutUrl })
-                    return items
-                }
-                PlasmaComponents.ToolButton {
-                    width:  Math.round(compact.h * 0.55)
-                    height: Math.round(compact.h * 0.55)
-                    icon.name: modelData.icon
-                    onClicked: {
-                        if (modelData.cmd) executable.connectSource(modelData.cmd)
-                        else Qt.openUrlExternally(modelData.url)
+                    PlasmaComponents.Button {
+                        width: (sidebarButtons.width - 8) / 3
+                        text: modelData.label; icon.name: modelData.icon; font.pixelSize: 10
+                        onClicked: Qt.openUrlExternally(modelData.url)
                     }
-                    PlasmaComponents.ToolTip { text: modelData.tip }
+                }
+            }
+
+            Row {
+                width: parent.width; spacing: 4
+                PlasmaComponents.Button {
+                    width: (sidebarButtons.width - 4) / 2
+                    text: "Claude CLI"; icon.name: "utilities-terminal"; font.pixelSize: 10
+                    onClicked: executable.connectSource(root.terminalCmd())
+                    PlasmaComponents.ToolTip { text: i18n("Open Claude Code in terminal") }
+                }
+                PlasmaComponents.Button {
+                    width: (sidebarButtons.width - 4) / 2
+                    text: "VS Code"; icon.name: "vscode"; font.pixelSize: 10
+                    onClicked: executable.connectSource("code --reuse-window")
+                    PlasmaComponents.ToolTip { text: i18n("Open last VS Code window") }
+                }
+            }
+
+            Row {
+                width: parent.width
+                visible: Plasmoid.configuration.projectShortcutLabel !== ""
+                         && Plasmoid.configuration.projectShortcutUrl !== ""
+                PlasmaComponents.Button {
+                    width: parent.width
+                    text: Plasmoid.configuration.projectShortcutLabel
+                    icon.name: "folder-open"; font.pixelSize: 10
+                    onClicked: Qt.openUrlExternally(Plasmoid.configuration.projectShortcutUrl)
+                    PlasmaComponents.ToolTip { text: Plasmoid.configuration.projectShortcutUrl }
                 }
             }
         }
@@ -495,6 +527,7 @@ PlasmoidItem {
             }
             Connections {
                 target: root
+                function onThemeChanged()      { ringCanvas.requestPaint() }
                 function onSessionPctChanged() { ringCanvas.requestPaint() }
                 function onWeeklyPctChanged()  { ringCanvas.requestPaint() }
                 function onLoadingChanged()    { ringCanvas.requestPaint() }
@@ -604,6 +637,7 @@ PlasmoidItem {
             }
             Connections {
                 target: root
+                function onThemeChanged()        { apiRingCanvas.requestPaint() }
                 function onApiBudgetPctChanged() { apiRingCanvas.requestPaint() }
                 function onLoadingChanged()      { apiRingCanvas.requestPaint() }
             }
