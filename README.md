@@ -7,19 +7,21 @@ A KDE Plasma 6 widget for Linux that shows your **Claude Pro session and weekly 
 ## Features
 
 - **Compact panel view** — two concentric rings showing session (5h window) and weekly usage, plus time until next reset
-- **Sidebar view** — rings with all four values (session %, time, weekly %, time) inside the rings
+- **Sidebar view** — three modes: compact (ring + shortcuts), full widget (scales to sidebar width), or ring only
 - **Full desktop/popup view** — detailed rings with legend, exact percentages and reset times
 - **Quick links** — New Chat, Projects, Usage page, custom project shortcut
 - **App shortcuts** — open Claude CLI in your terminal or reopen VS Code
 - **Auto-refresh** — configurable interval (5 s – 10 min), or manual
 - **Minimal ring-only mode** — for desktop use; click the ring to open a shortcut menu
+- **Anthropic API mode** — track token usage and cost against your API budget
 - **i18n** — English, German, French, Spanish
 
 ## Requirements
 
 - KDE Plasma 6
 - Python 3
-- A Claude Pro account with an active browser session
+- A Claude Pro or Anthropic API account
+- `libsecret` — optional, for automatic cookie extraction from Chrome/Brave/Edge on KDE (`sudo pacman -S libsecret`)
 
 ## Installation
 
@@ -37,7 +39,7 @@ bash setup.sh
 
 Then: right-click your panel or desktop → **Add Widgets** → search for **Claude Usage**.
 
-> **Tip:** Firefox users get fully automatic setup. Chrome/Chromium users may need to paste the key manually if KDE Wallet encryption is active.
+> **Tip:** Firefox users get fully automatic setup. Chrome/Chromium/Brave users also work automatically if `libsecret` is installed — it reads the key from KWallet on your behalf.
 
 ## Getting your session key manually
 
