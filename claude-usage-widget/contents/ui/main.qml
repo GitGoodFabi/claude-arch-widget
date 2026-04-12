@@ -9,12 +9,24 @@ import org.kde.kirigami as Kirigami
 PlasmoidItem {
     id: root
 
+    // ── Claude.ai mode properties ─────────────────────────────────────────────
     property real sessionPct: 0
     property real weeklyPct: 0
     property string sessionResetsIn: "?"
     property string weeklyResetsIn: "?"
     property string sessionResetsAt: ""
     property string weeklyResetsAt: ""
+
+    // ── API mode properties ───────────────────────────────────────────────────
+    readonly property bool apiMode: Plasmoid.configuration.widgetMode === "api"
+    property string apiTokensDisplay: "—"
+    property string apiCostDisplay:   "—"
+    property string apiBudgetDisplay: "—"
+    property real   apiBudgetPct:     0
+    property bool   apiHasBudget:     false
+    property string apiWindowLabel:   "Monthly"
+
+    // ── Shared ────────────────────────────────────────────────────────────────
     property string errorMsg: ""
     property bool loading: true
     property bool isAuthError: false
@@ -98,19 +110,23 @@ PlasmoidItem {
         }
         return map[key] || map["amber"]
     }
-    onThemeChanged: { compactCanvas.requestPaint(); ringCanvas.requestPaint() }
+    onThemeChanged: { compactCanvas.requestPaint(); ringCanvas.requestPaint(); apiRingCanvas.requestPaint() }
 
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
 
     Plasmoid.toolTipMainText: root.loading
         ? i18n("Loading…")
         : root.errorMsg
-            ? i18n("Claude — Error")
-            : "Session " + Math.round(root.sessionPct) + "%   ·   Week " + Math.round(root.weeklyPct) + "%"
+            ? (root.apiMode ? i18n("Claude API — Error") : i18n("Claude — Error"))
+            : root.apiMode
+                ? root.apiTokensDisplay + " tokens" + (Plasmoid.configuration.apiShowCost ? "   ·   " + root.apiCostDisplay : "")
+                : "Session " + Math.round(root.sessionPct) + "%   ·   Week " + Math.round(root.weeklyPct) + "%"
 
     Plasmoid.toolTipSubText: root.loading || root.errorMsg ? "" :
-        i18n("Session resets in %1", root.sessionResetsIn) + "\n" +
-        i18n("Weekly resets in %1", root.weeklyResetsIn)
+        root.apiMode
+            ? root.apiWindowLabel + " · " + (root.apiHasBudget ? Math.round(root.apiBudgetPct) + "% of budget" : i18n("No budget cap"))
+            : i18n("Session resets in %1", root.sessionResetsIn) + "\n" +
+              i18n("Weekly resets in %1", root.weeklyResetsIn)
 
     preferredRepresentation: onDesktop ? fullRepresentation : compactRepresentation
 
@@ -119,7 +135,6 @@ PlasmoidItem {
 
     function terminalCmd() {
         var term = Plasmoid.configuration.terminalApp.trim() || "konsole"
-        // Login shell (-l) so ~/.local/bin is in PATH; exec bash keeps the terminal open
         if (term === "konsole")
             return "konsole --noclose -e bash -lc 'claude; exec bash'"
         if (term === "gnome-terminal" || term === "xfce4-terminal")
@@ -171,10 +186,18 @@ PlasmoidItem {
                 ctx.clearRect(0, 0, width, height)
                 var cx = width / 2, cy = height / 2
                 var lw = Math.max(2, width * 0.08)
-                arc(ctx, cx, cy, width * 0.44, lw, 1.0,                   root.theme.wT)
-                arc(ctx, cx, cy, width * 0.44, lw, root.weeklyPct  / 100, root.theme.w)
-                arc(ctx, cx, cy, width * 0.33, lw, 1.0,                   root.theme.sT)
-                arc(ctx, cx, cy, width * 0.33, lw, root.sessionPct / 100, root.theme.s)
+                if (root.apiMode) {
+                    // Single ring showing budget percentage (only when cap is set)
+                    if (root.apiHasBudget) {
+                        arc(ctx, cx, cy, width * 0.38, lw, 1.0,                      root.theme.sT)
+                        arc(ctx, cx, cy, width * 0.38, lw, root.apiBudgetPct / 100,  root.theme.s)
+                    }
+                } else {
+                    arc(ctx, cx, cy, width * 0.44, lw, 1.0,                   root.theme.wT)
+                    arc(ctx, cx, cy, width * 0.44, lw, root.weeklyPct  / 100, root.theme.w)
+                    arc(ctx, cx, cy, width * 0.33, lw, 1.0,                   root.theme.sT)
+                    arc(ctx, cx, cy, width * 0.33, lw, root.sessionPct / 100, root.theme.s)
+                }
             }
             function arc(ctx, cx, cy, r, lw, frac, color) {
                 ctx.beginPath()
@@ -187,15 +210,16 @@ PlasmoidItem {
             }
             Connections {
                 target: root
-                function onSessionPctChanged() { compactCanvas.requestPaint() }
-                function onWeeklyPctChanged()  { compactCanvas.requestPaint() }
-                function onLoadingChanged()    { compactCanvas.requestPaint() }
+                function onSessionPctChanged()   { compactCanvas.requestPaint() }
+                function onWeeklyPctChanged()    { compactCanvas.requestPaint() }
+                function onApiBudgetPctChanged() { compactCanvas.requestPaint() }
+                function onLoadingChanged()      { compactCanvas.requestPaint() }
             }
             onWidthChanged: requestPaint()
 
-            // Sidebar: all 4 values centered inside the ring (FixedHeight avoids default leading)
+            // ── Sidebar: claudeai mode text ───────────────────────────────────
             Column {
-                visible: compact.vertical
+                visible: compact.vertical && !root.apiMode
                 anchors.centerIn: parent
                 spacing: 0
 
@@ -241,11 +265,41 @@ PlasmoidItem {
                     lineHeight: parent.smallPx * 1.15
                 }
             }
+
+            // ── Sidebar: API mode text ────────────────────────────────────────
+            Column {
+                visible: compact.vertical && root.apiMode
+                anchors.centerIn: parent
+                spacing: 0
+
+                readonly property real bigPx:   Math.max(8, compactCanvas.width * 0.11)
+                readonly property real smallPx: Math.max(6, compactCanvas.width * 0.08)
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: root.loading ? "…" : root.errorMsg ? "!" : root.apiTokensDisplay
+                    color: root.errorMsg ? "#ff5555" : root.theme.s
+                    font.pixelSize: parent.bigPx
+                    font.bold: true
+                    lineHeightMode: Text.FixedHeight
+                    lineHeight: parent.bigPx * 1.15
+                }
+                Text {
+                    visible: Plasmoid.configuration.apiShowCost && !root.loading && !root.errorMsg
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: root.apiCostDisplay
+                    color: root.theme.sDim
+                    font.pixelSize: parent.smallPx
+                    font.weight: Font.Medium
+                    lineHeightMode: Text.FixedHeight
+                    lineHeight: parent.smallPx * 1.15
+                }
+            }
         }
 
-        // Horizontal panel: text to the right of the ring
+        // ── Horizontal panel: claudeai mode text ──────────────────────────────
         Column {
-            visible: !compact.vertical
+            visible: !compact.vertical && !root.apiMode
             anchors.verticalCenter: parent.verticalCenter
             anchors.left:           compactCanvas.right
             anchors.leftMargin:     Math.round(compact.h * 0.15)
@@ -266,9 +320,33 @@ PlasmoidItem {
             }
         }
 
-        // Sidebar shortcuts — same layout as desktop popup
+        // ── Horizontal panel: API mode text ───────────────────────────────────
         Column {
-            visible: compact.vertical && Plasmoid.configuration.sidebarShortcuts
+            visible: !compact.vertical && root.apiMode
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.left:           compactCanvas.right
+            anchors.leftMargin:     Math.round(compact.h * 0.15)
+            spacing: 0
+
+            Text {
+                width: compact.textW
+                text: root.loading ? "…" : root.errorMsg ? "!" : root.apiTokensDisplay
+                color: root.errorMsg ? "#ff5555" : root.theme.s
+                font.pixelSize: Math.round(compact.h * 0.32)
+                font.bold: true
+            }
+            Text {
+                visible: Plasmoid.configuration.apiShowCost
+                width: compact.textW
+                text: root.loading || root.errorMsg ? "" : root.apiCostDisplay
+                color: Kirigami.Theme.disabledTextColor
+                font.pixelSize: Math.round(compact.h * 0.22)
+            }
+        }
+
+        // ── Sidebar shortcuts (claudeai mode only) ────────────────────────────
+        Column {
+            visible: compact.vertical && !root.apiMode && Plasmoid.configuration.sidebarShortcuts
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top:              compactCanvas.bottom
             anchors.topMargin:        Math.round(compact.h * 0.08)
@@ -306,19 +384,21 @@ PlasmoidItem {
         id: fullView
         opacity: Plasmoid.configuration.widgetOpacity
 
-        Layout.minimumWidth:   Plasmoid.configuration.minimalView ? 120 : 220
-        Layout.minimumHeight:  Plasmoid.configuration.minimalView ? 120 : 300
-        Layout.preferredWidth: Plasmoid.configuration.minimalView ? 180 : (onDesktop ? 340 : 280)
-        Layout.fillWidth:      true
-        Layout.fillHeight:     true
-
-        readonly property bool minimal: Plasmoid.configuration.minimalView
+        // minimalView is claude.ai-only; force off in API mode
+        readonly property bool minimal: Plasmoid.configuration.minimalView && !root.apiMode
         readonly property real pad:     16
         readonly property real headerH: 36
-        readonly property real buttonsH: hasProjectShortcut ? 100 : 70
         readonly property bool hasProjectShortcut:
+            !root.apiMode &&
             Plasmoid.configuration.projectShortcutLabel !== "" &&
             Plasmoid.configuration.projectShortcutUrl   !== ""
+        readonly property real buttonsH: root.apiMode ? 0 : (hasProjectShortcut ? 100 : 70)
+
+        Layout.minimumWidth:   minimal ? 120 : 220
+        Layout.minimumHeight:  minimal ? 120 : 300
+        Layout.preferredWidth: minimal ? 180 : (onDesktop ? 340 : 280)
+        Layout.fillWidth:      true
+        Layout.fillHeight:     true
 
         readonly property real availH: height - headerH - buttonsH - pad * 3
         readonly property real ringDiam: minimal
@@ -332,7 +412,7 @@ PlasmoidItem {
             opacity: Plasmoid.configuration.backgroundOpacity
         }
 
-        // ── Header (full view only) ──
+        // ── Header ──
         Item {
             id: header
             visible: !fullView.minimal
@@ -341,7 +421,7 @@ PlasmoidItem {
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Claude"
+                text: root.apiMode ? "Claude API" : "Claude"
                 color: "white"; font.bold: true
                 font.pixelSize: Math.max(13, fullView.ringDiam * 0.09)
             }
@@ -363,7 +443,7 @@ PlasmoidItem {
             Text {
                 width: parent.width
                 text: root.isAuthError
-                    ? i18n("Session key missing or expired.")
+                    ? (root.apiMode ? i18n("API key missing or invalid.") : i18n("Session key missing or expired."))
                     : root.errorMsg
                 color: "#ff5555"; wrapMode: Text.Wrap
                 font.pixelSize: Math.max(10, fullView.ringDiam * 0.07)
@@ -371,23 +451,27 @@ PlasmoidItem {
             Text {
                 visible: root.isAuthError
                 width: parent.width
-                text: i18n("Run setup.sh from the widget repository, or paste your sessionKey from claude.ai cookies.")
+                text: root.apiMode
+                    ? i18n("Add your Anthropic Admin API key in the widget settings.")
+                    : i18n("Run setup.sh from the widget repository, or paste your sessionKey from claude.ai cookies.")
                 color: Qt.rgba(1,1,1,0.5); wrapMode: Text.Wrap
                 font.pixelSize: Math.max(9, fullView.ringDiam * 0.06)
             }
             PlasmaComponents.Button {
                 visible: root.isAuthError
-                text: i18n("Open Setup Guide")
-                icon.name: "help-contents"
+                text: root.apiMode ? i18n("Open API Console") : i18n("Open Setup Guide")
+                icon.name: root.apiMode ? "internet-web-browser" : "help-contents"
                 font.pixelSize: 10
-                onClicked: Qt.openUrlExternally("https://github.com/GitGoodFabi/claude-arch-widget#installation")
+                onClicked: Qt.openUrlExternally(root.apiMode
+                    ? "https://console.anthropic.com/settings/keys"
+                    : "https://github.com/GitGoodFabi/claude-arch-widget#installation")
             }
         }
 
-        // ── Rings ──
+        // ── Claude.ai Rings ──
         Canvas {
             id: ringCanvas
-            visible: root.errorMsg === ""
+            visible: root.errorMsg === "" && !root.apiMode
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top:       fullView.minimal ? parent.top : header.bottom
             anchors.topMargin: fullView.minimal ? (parent.height - fullView.ringDiam) / 2 : fullView.pad / 2
@@ -418,7 +502,7 @@ PlasmoidItem {
             }
             onWidthChanged: requestPaint()
 
-            // Text centered in the ring — works cleanly for both minimal and full views
+            // Text centered in the ring
             Column {
                 anchors.centerIn: parent
                 spacing: 2
@@ -444,7 +528,7 @@ PlasmoidItem {
         // Minimal view: clicking the ring opens the shortcut popup
         MouseArea {
             anchors.fill: ringCanvas
-            visible: fullView.minimal
+            visible: fullView.minimal && !root.apiMode
             cursorShape: Qt.PointingHandCursor
             onClicked: minimalPopup.visible = !minimalPopup.visible
         }
@@ -488,10 +572,181 @@ PlasmoidItem {
             }
         }
 
-        // ── Legend (full view only) ──
+        // ── API mode: budget ring (shown when a budget cap is configured) ──
+        Canvas {
+            id: apiRingCanvas
+            visible: root.errorMsg === "" && root.apiMode && root.apiHasBudget
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top:       header.bottom
+            anchors.topMargin: fullView.pad / 2
+            width:  fullView.ringDiam
+            height: fullView.ringDiam
+
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.clearRect(0, 0, width, height)
+                var cx = width / 2, cy = height / 2
+                var lw = Math.max(4, width * 0.055)
+                var r  = width * 0.38
+                // Track
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI)
+                ctx.strokeStyle = root.theme.sT; ctx.lineWidth = lw; ctx.lineCap = "butt"; ctx.stroke()
+                // Fill
+                var f = Math.min(Math.max(root.apiBudgetPct, 0), 100) / 100
+                if (f > 0) {
+                    ctx.beginPath()
+                    if (f >= 1.0)
+                        ctx.arc(cx, cy, r, 0, 2 * Math.PI)
+                    else
+                        ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * f)
+                    ctx.strokeStyle = root.theme.s; ctx.lineWidth = lw
+                    ctx.lineCap = f >= 1.0 ? "butt" : "round"; ctx.stroke()
+                }
+            }
+            Connections {
+                target: root
+                function onApiBudgetPctChanged() { apiRingCanvas.requestPaint() }
+                function onLoadingChanged()      { apiRingCanvas.requestPaint() }
+            }
+            onWidthChanged: requestPaint()
+
+            // Inside the ring: budget percentage + spend/cap
+            Column {
+                anchors.centerIn: parent
+                spacing: 3
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: root.loading ? "…" : Math.round(root.apiBudgetPct) + "%"
+                    color: root.theme.s
+                    font.pixelSize: Math.max(11, apiRingCanvas.width * 0.13)
+                    font.bold: true
+                }
+                Text {
+                    visible: Plasmoid.configuration.apiShowCost
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: root.apiBudgetDisplay
+                    color: root.theme.sLbl
+                    font.pixelSize: Math.max(6, apiRingCanvas.width * 0.052)
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: i18n("BUDGET")
+                    color: root.theme.sLbl
+                    font.pixelSize: Math.max(5, apiRingCanvas.width * 0.042)
+                    font.letterSpacing: 1.5
+                }
+            }
+        }
+
+        // ── API mode: token + cost stats (with budget cap → below ring) ──
+        Column {
+            visible: root.errorMsg === "" && root.apiMode && root.apiHasBudget
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: apiRingCanvas.bottom
+            anchors.topMargin: 10
+            spacing: 4
+
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: 16
+
+                Column {
+                    spacing: 2
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: root.loading ? "…" : root.apiTokensDisplay
+                        color: root.theme.s
+                        font.pixelSize: Math.max(14, fullView.ringDiam * 0.11)
+                        font.bold: true
+                    }
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: i18n("TOKENS")
+                        color: root.theme.sLbl
+                        font.pixelSize: Math.max(6, fullView.ringDiam * 0.042)
+                        font.letterSpacing: 1.5
+                    }
+                }
+
+                Column {
+                    visible: Plasmoid.configuration.apiShowCost && !root.loading && !root.errorMsg
+                    spacing: 2
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: root.apiCostDisplay
+                        color: root.theme.w
+                        font.pixelSize: Math.max(14, fullView.ringDiam * 0.11)
+                        font.bold: true
+                    }
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: i18n("COST")
+                        color: root.theme.wDim
+                        font.pixelSize: Math.max(6, fullView.ringDiam * 0.042)
+                        font.letterSpacing: 1.5
+                    }
+                }
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: root.apiWindowLabel
+                color: Qt.rgba(1,1,1,0.3)
+                font.pixelSize: Math.max(8, fullView.ringDiam * 0.048)
+                font.letterSpacing: 0.5
+            }
+        }
+
+        // ── API mode: token + cost stats (no budget cap → centered) ──
+        Column {
+            visible: root.errorMsg === "" && root.apiMode && !root.apiHasBudget
+            anchors.centerIn: parent
+            spacing: 6
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: root.loading ? "…" : root.apiTokensDisplay
+                color: root.theme.s
+                font.pixelSize: Math.max(36, fullView.ringDiam * 0.32)
+                font.bold: true
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: i18n("TOKENS")
+                color: root.theme.sLbl
+                font.pixelSize: Math.max(9, fullView.ringDiam * 0.058)
+                font.letterSpacing: 2
+            }
+
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: Math.max(60, fullView.ringDiam * 0.4)
+                height: 1
+                color: Qt.rgba(1,1,1,0.08)
+            }
+
+            Text {
+                visible: Plasmoid.configuration.apiShowCost && !root.loading && !root.errorMsg
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: root.apiCostDisplay
+                color: root.theme.w
+                font.pixelSize: Math.max(26, fullView.ringDiam * 0.23)
+                font.bold: true
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: root.apiWindowLabel
+                color: Qt.rgba(1,1,1,0.3)
+                font.pixelSize: Math.max(9, fullView.ringDiam * 0.052)
+                font.letterSpacing: 1
+            }
+        }
+
+        // ── Legend (claudeai mode only) ──
         Column {
             id: legend
-            visible: root.errorMsg === "" && !fullView.minimal
+            visible: root.errorMsg === "" && !fullView.minimal && !root.apiMode
             anchors { bottom: buttons.top; left: parent.left; right: parent.right
                       margins: fullView.pad; bottomMargin: 8 }
             spacing: 4
@@ -529,10 +784,10 @@ PlasmoidItem {
             }
         }
 
-        // ── Quick links (full view only) ──
+        // ── Quick links (claudeai mode only) ──
         Column {
             id: buttons
-            visible: !fullView.minimal && Plasmoid.configuration.desktopShortcuts
+            visible: !fullView.minimal && Plasmoid.configuration.desktopShortcuts && !root.apiMode
             anchors { bottom: parent.bottom; left: parent.left; right: parent.right
                       margins: fullView.pad; bottomMargin: fullView.pad }
             spacing: 5
@@ -606,18 +861,29 @@ PlasmoidItem {
                 if (j.error) {
                     root.errorMsg = j.error
                     root.isAuthError = j.error.toLowerCase().indexOf("session key") !== -1
+                        || j.error.toLowerCase().indexOf("api key") !== -1
                         || j.error.indexOf("401") !== -1
                         || j.error.indexOf("403") !== -1
                     return
                 }
-                root.errorMsg        = ""
-                root.sessionPct      = j.session.utilization
-                root.sessionResetsIn = j.session.resets_in
-                root.sessionResetsAt = j.session.resets_at
-                root.weeklyPct       = j.weekly.utilization
-                root.weeklyResetsIn  = j.weekly.resets_in
-                root.weeklyResetsAt  = j.weekly.resets_at
-                checkNotifications()
+                root.errorMsg = ""
+                if (j.mode === "api") {
+                    root.apiTokensDisplay = j.tokens.display
+                    root.apiBudgetPct     = j.budget.pct
+                    root.apiHasBudget     = j.budget.has_cap
+                    root.apiCostDisplay   = j.cost.display
+                    root.apiBudgetDisplay = j.cost.budget_display
+                    root.apiWindowLabel   = j.window.charAt(0).toUpperCase() + j.window.slice(1)
+                    apiRingCanvas.requestPaint()
+                } else {
+                    root.sessionPct      = j.session.utilization
+                    root.sessionResetsIn = j.session.resets_in
+                    root.sessionResetsAt = j.session.resets_at
+                    root.weeklyPct       = j.weekly.utilization
+                    root.weeklyResetsIn  = j.weekly.resets_in
+                    root.weeklyResetsAt  = j.weekly.resets_at
+                    checkNotifications()
+                }
             } catch(e) {
                 root.errorMsg = i18n("Parse error: %1", e)
             }
@@ -689,13 +955,31 @@ PlasmoidItem {
         root.loading = true
         root.errorMsg = ""
         root.isAuthError = false
-        var path = (Plasmoid.configuration.scriptPath || "").trim()
-        if (!path) {
-            // Use the script bundled inside the plasmoid — works after Discover install
-            // without any separate setup step (session key is still required)
-            path = Qt.resolvedUrl("../code/claude_usage.py").toString().replace("file://", "")
+        if (root.apiMode) {
+            var apiKey = (Plasmoid.configuration.apiKey || "").trim()
+            if (!apiKey) {
+                root.loading  = false
+                root.errorMsg = i18n("No API key configured.")
+                root.isAuthError = true
+                return
+            }
+            var window   = Plasmoid.configuration.apiTimeWindow || "monthly"
+            var currency = Plasmoid.configuration.apiCurrency   || "EUR"
+            var cap      = Plasmoid.configuration.apiBudgetCap  || 0
+            var apiPath  = Qt.resolvedUrl("../code/api_usage.py").toString().replace("file://", "")
+            executable.connectSource(
+                "mkdir -p ~/.config/claude-widget && " +
+                "printf '%s' '" + escapeShellArg(apiKey) + "' > ~/.config/claude-widget/api_key.txt && " +
+                "chmod 600 ~/.config/claude-widget/api_key.txt && " +
+                "python3 \"" + apiPath + "\" " + window + " " + currency + " " + cap
+            )
+        } else {
+            var path = (Plasmoid.configuration.scriptPath || "").trim()
+            if (!path) {
+                path = Qt.resolvedUrl("../code/claude_usage.py").toString().replace("file://", "")
+            }
+            executable.connectSource("python3 \"" + path + "\"")
         }
-        executable.connectSource("python3 \"" + path + "\"")
     }
 
     Timer {

@@ -5,6 +5,24 @@
     <entry name="backgroundOpacity" type="Double">
       <default>0.0</default>
     </entry>
+    <entry name="widgetMode" type="String">
+      <default>claudeai</default>
+    </entry>
+    <entry name="apiKey" type="String">
+      <default></default>
+    </entry>
+    <entry name="apiTimeWindow" type="String">
+      <default>monthly</default>
+    </entry>
+    <entry name="apiShowCost" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="apiCurrency" type="String">
+      <default>EUR</default>
+    </entry>
+    <entry name="apiBudgetCap" type="Double">
+      <default>0</default>
+    </entry>
     <entry name="scriptPath" type="String">
       <default></default>
     </entry>
