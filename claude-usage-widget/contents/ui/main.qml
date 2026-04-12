@@ -114,19 +114,18 @@ PlasmoidItem {
 
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
 
-    Plasmoid.toolTipMainText: root.loading
-        ? i18n("Loading…")
-        : root.errorMsg
-            ? (root.apiMode ? i18n("Claude API — Error") : i18n("Claude — Error"))
-            : root.apiMode
-                ? root.apiTokensDisplay + " tokens" + (Plasmoid.configuration.apiShowCost ? "   ·   " + root.apiCostDisplay : "")
-                : "Session " + Math.round(root.sessionPct) + "%   ·   Week " + Math.round(root.weeklyPct) + "%"
-
-    Plasmoid.toolTipSubText: root.loading || root.errorMsg ? "" :
-        root.apiMode
-            ? root.apiWindowLabel + " · " + (root.apiHasBudget ? Math.round(root.apiBudgetPct) + "% of budget" : i18n("No budget cap"))
-            : i18n("Session resets in %1", root.sessionResetsIn) + "\n" +
-              i18n("Weekly resets in %1", root.weeklyResetsIn)
+    Plasmoid.toolTipMainText: {
+        if (root.loading) return i18n("Loading…")
+        if (root.errorMsg) return root.apiMode ? i18n("Claude API — Error") : i18n("Claude — Error")
+        if (root.apiMode) {
+            var line1 = root.apiTokensDisplay + " tokens" + (Plasmoid.configuration.apiShowCost ? "   ·   " + root.apiCostDisplay : "")
+            var line2 = root.apiWindowLabel + " · " + (root.apiHasBudget ? Math.round(root.apiBudgetPct) + "% of budget" : i18n("No budget cap"))
+            return line1 + "\n" + line2
+        }
+        return "Session " + Math.round(root.sessionPct) + "%   ·   Week " + Math.round(root.weeklyPct) + "%" +
+               "\n" + i18n("Session resets in %1", root.sessionResetsIn) +
+               "\n" + i18n("Weekly resets in %1", root.weeklyResetsIn)
+    }
 
     preferredRepresentation: onDesktop ? fullRepresentation : compactRepresentation
 
