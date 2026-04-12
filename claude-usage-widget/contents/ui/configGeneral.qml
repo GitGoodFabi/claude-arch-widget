@@ -4,8 +4,9 @@ import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 import org.kde.kquickcontrols as KQuickControls
 
-Kirigami.FormLayout {
-    id: configPage
+Item {
+    id: configRoot
+    // cfg_* properties must live on the root item for the KDE config system
 
     // ── Mode ──────────────────────────────────────────────────────────────────
     property alias cfg_widgetMode:    modeCombo.currentValue
@@ -28,7 +29,6 @@ Kirigami.FormLayout {
     property alias cfg_projectShortcutUrl:    projectUrlField.text
     property alias cfg_minimalView:           minimalToggle.checked
     property alias cfg_sidebarView:           sidebarViewCombo.currentValue
-    property alias cfg_desktopShortcuts:      desktopShortcutsToggle.checked
     property alias cfg_scriptPath:            scriptPathField.text
     property alias cfg_notifySession25: notifyS25.checked
     property alias cfg_notifySession50: notifyS50.checked
@@ -38,6 +38,11 @@ Kirigami.FormLayout {
     property alias cfg_notifyWeekly50:  notifyW50.checked
     property alias cfg_notifyWeekly80:  notifyW80.checked
     property alias cfg_notifyWeekly95:  notifyW95.checked
+    property alias cfg_desktopShortcuts: desktopShortcutsToggle.checked
+
+    Kirigami.FormLayout {
+        id: configPage
+        anchors { top: parent.top; left: parent.left; right: parent.right; bottom: parent.bottom }
 
     readonly property bool isApiMode: modeCombo.currentValue === "api"
 
@@ -310,4 +315,26 @@ Kirigami.FormLayout {
         PlasmaComponents.CheckBox { id: notifyW80; text: "80%" }
         PlasmaComponents.CheckBox { id: notifyW95; text: "95%" }
     }
-}
+
+    } // Kirigami.FormLayout
+
+    // ── Buy me a coffee — anchored to bottom-right of the config window ───────
+    Image {
+        anchors.bottom: parent.bottom
+        anchors.left:   parent.left
+        anchors.margins: 12
+        width: 70
+        height: 70
+        source: Qt.resolvedUrl("../icons/bmc_qr.png")
+        smooth: true
+        opacity: 0.75
+
+        MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: Qt.openUrlExternally("https://buymeacoffee.com/02nmd")
+        }
+        PlasmaComponents.ToolTip { text: "Buy me a coffee ☕" }
+    }
+
+} // Item (root)

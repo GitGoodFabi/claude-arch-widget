@@ -5,6 +5,9 @@ session*
 *token*
 *.txt
 
+# Build artifact — regenerate with package.sh
+*.plasmoid
+
 # KDE QML cache
 *.qmlc
 *.jsc
