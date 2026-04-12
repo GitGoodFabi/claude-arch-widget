@@ -1,65 +1,86 @@
-# KDE Store Listing — Claude Usage Monitor
+# KDE Store Listing: Claude Usage Monitor
 
 ## Short tagline (max ~80 chars)
-Because "why did Claude stop responding" is not a great debugging strategy.
+Started as a simple usage widget. Got a bit out of hand.
 
 ---
 
 ## Full description (paste into store.kde.org "Description" field)
 
-You know that moment mid-flow when Claude just… stops? Turns out you burned
-through your session limit 20 minutes ago and had absolutely no idea. Cool
-feature. Very useful. 10/10.
+This is my first publicly released piece of software. Thought you should know
+that upfront.
 
-**Claude Usage Monitor** fixes that. It sits in your panel, on your desktop,
-or in your sidebar and shows your session (5-hour rolling window) and weekly
-usage as two live rings — so you can see the wall coming before you run into
-it face-first.
+It started simple: I wanted a widget that shows my Claude usage in the panel.
+The existing ones didn't quite do what I wanted, so I figured: how hard can
+it be. Several rabbit holes later, it's fully themeable, runs in panels,
+sidebars, and on the desktop, has a minimal ring-only mode, shortcut buttons,
+desktop notifications at configurable thresholds, and an API monitoring mode
+I haven't fully battle-tested yet. Classic.
 
-**Looks good doing it too**
+A fair amount of this was coded with Claude's help. I'm aware of how that
+sounds given what the widget does. I tried to keep resource usage sensible
+and avoid obvious security holes. I'm a beginner writing for people who
+almost certainly are not, so go easy on me.
 
-7 built-in color themes — Amber (Claude's own orange), Ocean, Aurora, Violet,
-Liquid Glass, Emerald, and Rose — plus a full custom color picker if none of
-those match your rice. Opacity controls for both the widget and background,
-because your setup matters.
+I know this is roughly widget number 2011 in the "Claude usage for KDE"
+category. I like mine. Maybe you will too.
 
-**Lives wherever you put it**
+**What it actually does**
 
-- **Panel** — compact ring + percentage, fits any taskbar
-- **Sidebar** — vertical mode with all four stats inside the ring
-- **Desktop** — full popup with rings, legend, reset times, and shortcuts
+Shows your Claude session (5-hour rolling window) and weekly usage as two
+live rings in your panel, sidebar, or on the desktop, so you can see the wall
+coming before you run into it face-first.
 
-**Shortcuts, because clicking is work**
+**Wherever you put it**
+
+- **Panel** - compact rings + percentage, fits any taskbar
+- **Sidebar** - vertical mode with all four stats inside the rings
+- **Desktop** - full popup with rings, legend, reset times, and shortcuts
+- **Minimal mode** - rings only, click to open shortcuts
+
+**Looks decent too**
+
+7 built-in color themes (Amber, Ocean, Aurora, Violet, Liquid Glass, Emerald,
+Rose) plus a full custom color picker. Opacity controls for background and
+widget, because your rice matters.
+
+**Shortcuts**
 
 One click to New Chat, Projects, your Usage page, Claude CLI in a terminal,
-VS Code, or your own custom project link. You configure the terminal — konsole,
-kitty, foot, WezTerm, whatever you run.
+VS Code, or a custom project link. You pick the terminal.
 
-**Notifications that actually matter**
+**Notifications**
 
-Optional desktop alerts when you hit 25 %, 50 %, 80 %, or 95 % — separately
-for session and weekly. Enable only what you care about, ignore the rest.
-Notifications don't re-fire on plasmashell restart either, because that would
-be annoying and we thought about it.
+Optional alerts at 25 %, 50 %, 80 %, 95 %, separately for session and
+weekly. They don't re-fire on plasmashell restart either, because that would
+be unreasonable.
 
 **Requirements**
 
 - KDE Plasma 6
 - Python 3
-- `libnotify` (`notify-send`) — for notifications
+- `libnotify` (`notify-send`) for notifications
 - A claude.ai account (Pro or Max)
 
 **Installation**
 
-1. Install via Discover or the KDE Widget Store
-2. Run `setup.sh` once — auto-extracts your session cookie from Firefox or
-   Chromium, or lets you paste it manually if you enjoy doing things the hard way
-3. Add the widget to your panel or desktop
+```
+git clone https://github.com/GitGoodFabi/claude-arch-widget.git
+cd claude-arch-widget
+bash setup.sh
+```
 
-Session key expired? Re-run `setup.sh`. The widget will tell you when it
-happens and point you at the fix — no detective work required.
+`setup.sh` auto-extracts your session cookie from Firefox or Chromium, tests
+the connection, installs the widget, and restarts Plasma. Session key expired?
+Re-run `setup.sh`.
 
-**Source & bugs**
+**Bugs**
+
+If you find any, please open an issue. I genuinely want to know and will do
+my best to fix them. I hope this brings some small amount of joy to at least a
+few people.
+
+**Source**
 
 https://github.com/GitGoodFabi/claude-arch-widget
 

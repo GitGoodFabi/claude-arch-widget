@@ -114,7 +114,7 @@ PlasmoidItem {
 
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
 
-    Plasmoid.toolTipMainText: {
+    toolTipMainText: {
         if (root.loading) return i18n("Loading…")
         if (root.errorMsg) return root.apiMode ? i18n("Claude API — Error") : i18n("Claude — Error")
         if (root.apiMode) {
