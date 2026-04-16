@@ -13,7 +13,10 @@ COOKIE_FILE = Path.home() / ".config" / "claude-widget" / "session.txt"
 
 def load_session_key():
     if not COOKIE_FILE.exists():
-        print(json.dumps({"error": f"No session key found. Run setup:\nmkdir -p {COOKIE_FILE.parent} && echo 'YOUR_SESSION_KEY' > {COOKIE_FILE}"}))
+        print(json.dumps({
+            "error": f"No session key found. Run setup:\nmkdir -p {COOKIE_FILE.parent} && echo 'YOUR_SESSION_KEY' > {COOKIE_FILE}",
+            "auth": True,
+        }))
         sys.exit(1)
     return COOKIE_FILE.read_text().strip()
 
@@ -50,10 +53,13 @@ def main():
     try:
         orgs = make_request(ORGS_URL, session_key)
     except urllib.error.HTTPError as e:
-        print(json.dumps({"error": f"HTTP {e.code} fetching orgs. Session key may be expired."}))
+        print(json.dumps({
+            "error": f"HTTP {e.code} fetching orgs. Session key may be expired.",
+            "auth": e.code in (401, 403),
+        }))
         sys.exit(1)
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        print(json.dumps({"error": str(e), "auth": False}))
         sys.exit(1)
 
     # Pick first active org
@@ -72,10 +78,10 @@ def main():
     try:
         data = make_request(usage_url, session_key)
     except urllib.error.HTTPError as e:
-        print(json.dumps({"error": f"HTTP {e.code} fetching usage."}))
+        print(json.dumps({"error": f"HTTP {e.code} fetching usage.", "auth": e.code in (401, 403)}))
         sys.exit(1)
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        print(json.dumps({"error": str(e), "auth": False}))
         sys.exit(1)
 
     five_hour = data.get("five_hour") or {}

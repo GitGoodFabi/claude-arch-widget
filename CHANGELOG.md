@@ -2,6 +2,44 @@
 
 All notable changes to Claude Usage Monitor are documented here.
 
+## [1.4] - 2026-04-16
+
+### Added
+- **Per-model breakdown** in API view: top 3 models by token volume with individual spend and percentage
+- **Prompt cache stats** in API view: cache read tokens and cache efficiency percentage
+- **Daily average and projected monthly spend** in API view
+- **"All time" window** for API mode (last 365 days)
+- **Budget mode toggle**: show cap countdown for the selected window or hide it entirely
+- **API ring display mode**: choose whether the ring fills for remaining budget or used spend
+- **Follow Plasma theme**: widget auto-switches color theme based on KDE dark/light mode
+- **Separate light/dark theme pair**: set one theme for light mode and another for dark, applied automatically
+- **Sync settings between instances**: `syncSettingsByMode` keeps multiple widgets on the same desktop in sync
+- **Extended refresh intervals**: 30 minutes, 1 hour, 2 hours, and 6 hours — useful for API mode to avoid rate limits
+- **API result cache** (`api_cache.py`): widget shows last good data immediately on open while a fresh fetch runs in background
+
+### Fixed
+- Admin API key validation now caches the result locally — the `/organizations/me` round-trip is skipped on every refresh after the first, cutting API calls per tick from 3 to 2 and reducing 429 rate-limit exposure
+
+## [1.3] - 2026-04-14
+
+### Added
+- Anthropic API mode is now live and working with organization Admin API keys
+- API usage view now shows token breakdown, model spend, daily average, projected spend, and prompt caching info
+- Manual cap countdown can be shown for the selected API window or disabled entirely
+
+### Changed
+- API mode now treats the manual cap in the selected display currency instead of implicitly converting a USD cap
+- API mode enforces a safer minimum refresh interval to reduce Anthropic Admin API rate limiting
+- API settings and error messages now explain that the feature requires an organization Admin API key
+- Widget/store metadata and documentation now highlight API mode as a shipped feature
+
+### Fixed
+- Admin API key validation now accepts current Anthropic Admin key prefixes like `sk-ant-admin01-...`
+- API errors now surface the real script/backend message instead of collapsing to generic `Script failed`
+- API detail view is scrollable and keeps previous values visible during refresh, avoiding empty/overlapping states in smaller popups
+- Manual cap ring rendering is restored when cap countdown is enabled
+- API mode now handles Anthropic `HTTP 429` responses with a clearer rate-limit message
+
 ## [1.2] - 2026-04-12
 
 ### Fixed

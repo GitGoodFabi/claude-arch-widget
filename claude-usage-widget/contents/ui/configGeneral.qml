@@ -7,17 +7,61 @@ import org.kde.kquickcontrols as KQuickControls
 Item {
     id: configRoot
     // cfg_* properties must live on the root item for the KDE config system
+    property string title: i18n("General")
+
+    // Plasma injects cfg_*Default values into the config page root item.
+    // Define them explicitly so the config dialog can initialize cleanly.
+    property string cfg_widgetModeDefault: "claudeai"
+    property bool cfg_syncSettingsByModeDefault: true
+    property string cfg_apiKeyDefault: ""
+    property string cfg_apiTimeWindowDefault: "monthly"
+    property bool cfg_apiShowCostDefault: true
+    property string cfg_apiCurrencyDefault: "EUR"
+    property double cfg_apiBudgetCapDefault: 0
+    property string cfg_apiBudgetModeDefault: "selected"
+    property string cfg_apiRingDisplayDefault: "remaining"
+    property double cfg_backgroundOpacityDefault: 0.0
+    property string cfg_colorThemeDefault: "amber"
+    property bool cfg_followPlasmaThemeDefault: false
+    property string cfg_lightModeThemeDefault: "amber"
+    property string cfg_darkModeThemeDefault: "violet"
+    property string cfg_customSessionColorDefault: "#FF7300"
+    property string cfg_customWeeklyColorDefault: "#FFB347"
+    property bool cfg_desktopShortcutsDefault: true
+    property bool cfg_minimalViewDefault: false
+    property bool cfg_notifySession25Default: false
+    property bool cfg_notifySession50Default: false
+    property bool cfg_notifySession80Default: false
+    property bool cfg_notifySession95Default: false
+    property bool cfg_notifyWeekly25Default: false
+    property bool cfg_notifyWeekly50Default: false
+    property bool cfg_notifyWeekly80Default: false
+    property bool cfg_notifyWeekly95Default: false
+    property string cfg_projectShortcutLabelDefault: ""
+    property string cfg_projectShortcutUrlDefault: ""
+    property int cfg_refreshIntervalSecondsDefault: 300
+    property string cfg_scriptPathDefault: ""
+    property string cfg_sidebarViewDefault: "compact"
+    property string cfg_terminalAppDefault: "konsole"
+    property bool cfg_timerEnabledDefault: true
+    property double cfg_widgetOpacityDefault: 1.0
 
     // ── Mode ──────────────────────────────────────────────────────────────────
     property alias cfg_widgetMode:    modeCombo.currentValue
-    property string cfg_apiKey:       ""
+    property alias cfg_syncSettingsByMode: syncSettingsToggle.checked
+    property alias  cfg_apiKey:       apiKeyField.text
     property alias cfg_apiTimeWindow: apiWindowCombo.currentValue
     property alias cfg_apiShowCost:   apiShowCostToggle.checked
     property alias cfg_apiCurrency:   apiCurrencyCombo.currentValue
-    property double cfg_apiBudgetCap: 0
+    property alias cfg_apiBudgetCap:  budgetCapValue.value
+    property alias cfg_apiBudgetMode: apiBudgetModeCombo.currentValue
+    property alias cfg_apiRingDisplay: apiRingDisplayCombo.currentValue
 
     // ── Appearance & Claude.ai settings ──────────────────────────────────────
     property alias cfg_colorTheme:            themeCombo.currentValue
+    property alias cfg_followPlasmaTheme:     followPlasmaThemeToggle.checked
+    property alias cfg_lightModeTheme:        lightThemeCombo.currentValue
+    property alias cfg_darkModeTheme:         darkThemeCombo.currentValue
     property string cfg_customSessionColor:   "#FF7300"
     property string cfg_customWeeklyColor:    "#FFB347"
     property alias cfg_widgetOpacity:         widgetOpacitySlider.value
@@ -46,6 +90,11 @@ Item {
 
     readonly property bool isApiMode: modeCombo.currentValue === "api"
 
+    QtObject {
+        id: budgetCapValue
+        property double value: 0
+    }
+
     // ── Widget mode ───────────────────────────────────────────────────────────
     PlasmaComponents.ComboBox {
         id: modeCombo
@@ -63,15 +112,42 @@ Item {
         }
     }
 
+    Row {
+        Kirigami.FormData.label: i18n("Shared mode settings:")
+        spacing: 6
+
+        PlasmaComponents.CheckBox {
+            id: syncSettingsToggle
+            text: i18n("Sync with all widgets in this mode")
+        }
+
+        PlasmaComponents.Label {
+            id: syncInfoLabel
+            text: i18n("(i)")
+            color: Kirigami.Theme.disabledTextColor
+            font.bold: true
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+            }
+
+            PlasmaComponents.ToolTip.text: i18n("When enabled, all Claude.ai widgets share one preset and all API widgets share another. Existing widgets only join the shared preset after you enable this option for them.")
+            PlasmaComponents.ToolTip.visible: syncInfoLabel.children[0].containsMouse
+        }
+    }
+
     // ── API settings (visible in API mode only) ───────────────────────────────
     PlasmaComponents.TextField {
         id: apiKeyField
         visible: configPage.isApiMode
-        Kirigami.FormData.label: i18n("Admin API key:")
-        placeholderText: "sk-ant-admin-..."
+        Kirigami.FormData.label: i18n("Org Admin API key:")
+        placeholderText: i18n("Paste new key to replace saved key")
         echoMode: TextInput.Password
-        Component.onCompleted: text = configPage.cfg_apiKey
-        onTextChanged: configPage.cfg_apiKey = text
+        Layout.maximumWidth: 260
+        PlasmaComponents.ToolTip.text: i18n("Requires an Anthropic organization Admin API key. A pasted key is written to the local widget config file and does not need to stay in this field.")
+        PlasmaComponents.ToolTip.visible: hovered
     }
 
     PlasmaComponents.ComboBox {
@@ -83,7 +159,8 @@ Item {
         model: [
             { label: i18n("Daily"),   value: "daily"   },
             { label: i18n("Weekly"),  value: "weekly"  },
-            { label: i18n("Monthly"), value: "monthly" }
+            { label: i18n("Monthly"), value: "monthly" },
+            { label: i18n("All time (12 months)"), value: "all" }
         ]
         Component.onCompleted: {
             for (var i = 0; i < model.length; i++) {
@@ -119,19 +196,62 @@ Item {
     PlasmaComponents.TextField {
         id: budgetCapField
         visible: configPage.isApiMode
-        Kirigami.FormData.label: i18n("Budget cap:")
-        placeholderText: i18n("e.g. 20.00 (leave empty for no cap)")
+        Kirigami.FormData.label: i18n("Manual cap:")
+        placeholderText: i18n("e.g. 20.00 (leave empty for none)")
         inputMethodHints: Qt.ImhFormattedNumbersOnly
-        Component.onCompleted: text = cfg_apiBudgetCap > 0 ? cfg_apiBudgetCap.toFixed(2) : ""
-        onEditingFinished: {
+        PlasmaComponents.ToolTip.text: i18n("Local widget cap only. This is not your Anthropic Console spend limit.")
+        PlasmaComponents.ToolTip.visible: hovered
+        Component.onCompleted: text = cfg_apiBudgetCap > 0 ? Number(cfg_apiBudgetCap).toFixed(2) : ""
+        onTextChanged: {
             var v = parseFloat(text)
-            configPage.cfg_apiBudgetCap = (isNaN(v) || v <= 0) ? 0 : v
+            budgetCapValue.value = (isNaN(v) || v <= 0) ? 0 : v
+        }
+    }
+
+    PlasmaComponents.ComboBox {
+        id: apiBudgetModeCombo
+        visible: configPage.isApiMode
+        Kirigami.FormData.label: i18n("Cap countdown:")
+        textRole: "label"
+        valueRole: "value"
+        model: [
+            { label: i18n("Selected window"), value: "selected" },
+            { label: i18n("None"),            value: "none"     }
+        ]
+        Component.onCompleted: {
+            for (var i = 0; i < model.length; i++) {
+                if (model[i].value === cfg_apiBudgetMode) { currentIndex = i; break }
+            }
+        }
+    }
+
+    PlasmaComponents.ComboBox {
+        id: apiRingDisplayCombo
+        visible: configPage.isApiMode && configPage.isApiMode
+        Kirigami.FormData.label: i18n("Ring shows:")
+        textRole: "label"
+        valueRole: "value"
+        model: [
+            { label: i18n("Spent (% of cap)"), value: "spent" },
+            { label: i18n("Remaining budget"), value: "remaining" }
+        ]
+        Component.onCompleted: {
+            for (var i = 0; i < model.length; i++) {
+                if (model[i].value === cfg_apiRingDisplay) { currentIndex = i; break }
+            }
         }
     }
 
     // ── Color theme (shared) ──────────────────────────────────────────────────
+    PlasmaComponents.CheckBox {
+        id: followPlasmaThemeToggle
+        Kirigami.FormData.label: i18n("Follow Plasma Theme:")
+        text: i18n("Switch with Plasma light/dark mode")
+    }
+
     PlasmaComponents.ComboBox {
         id: themeCombo
+        visible: !followPlasmaThemeToggle.checked
         Kirigami.FormData.label: i18n("Color theme:")
         textRole: "label"
         valueRole: "value"
@@ -152,22 +272,50 @@ Item {
         }
     }
 
+    PlasmaComponents.ComboBox {
+        id: lightThemeCombo
+        visible: followPlasmaThemeToggle.checked
+        Kirigami.FormData.label: i18n("Light mode theme:")
+        textRole: "label"
+        valueRole: "value"
+        model: themeCombo.model
+        Component.onCompleted: {
+            for (var i = 0; i < model.length; i++) {
+                if (model[i].value === cfg_lightModeTheme) { currentIndex = i; break }
+            }
+        }
+    }
+
+    PlasmaComponents.ComboBox {
+        id: darkThemeCombo
+        visible: followPlasmaThemeToggle.checked
+        Kirigami.FormData.label: i18n("Dark mode theme:")
+        textRole: "label"
+        valueRole: "value"
+        model: themeCombo.model
+        Component.onCompleted: {
+            for (var i = 0; i < model.length; i++) {
+                if (model[i].value === cfg_darkModeTheme) { currentIndex = i; break }
+            }
+        }
+    }
+
     KQuickControls.ColorButton {
         id: sessionColorBtn
         Kirigami.FormData.label: i18n("Session color:")
-        visible: themeCombo.currentValue === "custom"
+        visible: !followPlasmaThemeToggle.checked && themeCombo.currentValue === "custom"
         showAlphaChannel: false
-        Component.onCompleted: color = configPage.cfg_customSessionColor
-        onColorChanged: configPage.cfg_customSessionColor = color.toString()
+        Component.onCompleted: color = configRoot.cfg_customSessionColor
+        onColorChanged: configRoot.cfg_customSessionColor = color.toString()
     }
 
     KQuickControls.ColorButton {
         id: weeklyColorBtn
         Kirigami.FormData.label: i18n("Weekly color:")
-        visible: themeCombo.currentValue === "custom"
+        visible: !followPlasmaThemeToggle.checked && themeCombo.currentValue === "custom"
         showAlphaChannel: false
-        Component.onCompleted: color = configPage.cfg_customWeeklyColor
-        onColorChanged: configPage.cfg_customWeeklyColor = color.toString()
+        Component.onCompleted: color = configRoot.cfg_customWeeklyColor
+        onColorChanged: configRoot.cfg_customWeeklyColor = color.toString()
     }
 
     // ── View (Claude.ai mode only) ────────────────────────────────────────────
@@ -233,23 +381,54 @@ Item {
         text: i18n("Enabled")
     }
 
-    PlasmaComponents.ComboBox {
-        id: intervalCombo
+    Row {
         Kirigami.FormData.label: i18n("Interval:")
-        enabled: timerToggle.checked
-        textRole: "label"
-        valueRole: "value"
-        model: [
-            { label: i18n("5 seconds"),  value: 5   },
-            { label: i18n("30 seconds"), value: 30  },
-            { label: i18n("2 minutes"),  value: 120 },
-            { label: i18n("5 minutes"),  value: 300 },
-            { label: i18n("10 minutes"), value: 600 }
-        ]
-        Component.onCompleted: {
-            for (var i = 0; i < model.length; i++) {
-                if (model[i].value === cfg_refreshIntervalSeconds) { currentIndex = i; break }
+        spacing: 6
+
+        PlasmaComponents.ComboBox {
+            id: intervalCombo
+            enabled: timerToggle.checked
+            textRole: "label"
+            valueRole: "value"
+            model: [
+                { label: i18n("2 minutes"),  value: 120 },
+                { label: i18n("5 minutes"),  value: 300 },
+                { label: i18n("10 minutes"), value: 600 },
+                { label: i18n("30 minutes"), value: 1800 },
+                { label: i18n("1 hour"),     value: 3600 },
+                { label: i18n("2 hours"),    value: 7200 },
+                { label: i18n("6 hours"),    value: 21600 }
+            ]
+            Component.onCompleted: {
+                var matched = false
+                for (var i = 0; i < model.length; i++) {
+                    if (model[i].value === cfg_refreshIntervalSeconds) {
+                        currentIndex = i
+                        matched = true
+                        break
+                    }
+                }
+                if (!matched) {
+                    currentIndex = 0
+                    cfg_refreshIntervalSeconds = model[0].value
+                }
             }
+        }
+
+        PlasmaComponents.Label {
+            id: refreshInfoLabel
+            text: i18n("(i)")
+            color: Kirigami.Theme.disabledTextColor
+            font.bold: true
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+            }
+
+            PlasmaComponents.ToolTip.text: i18n("Anthropic can rate-limit frequent refreshes. Sorry about that. API mode now starts at 2 minutes to avoid unnecessary blocks.")
+            PlasmaComponents.ToolTip.visible: refreshInfoLabel.children[0].containsMouse
         }
     }
 

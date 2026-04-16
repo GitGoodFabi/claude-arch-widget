@@ -1,7 +1,7 @@
 # KDE Store Listing: Claude Usage Monitor
 
 ## Short tagline (max ~80 chars)
-Started as a simple usage widget. Got a bit out of hand.
+Live Claude usage for KDE: claude.ai limits plus Anthropic API spend.
 
 ---
 
@@ -14,8 +14,8 @@ It started simple: I wanted a widget that shows my Claude usage in the panel.
 The existing ones didn't quite do what I wanted, so I figured: how hard can
 it be. Several rabbit holes later, it's fully themeable, runs in panels,
 sidebars, and on the desktop, has a minimal ring-only mode, shortcut buttons,
-desktop notifications at configurable thresholds, and an API monitoring mode
-I haven't fully battle-tested yet. Classic.
+desktop notifications at configurable thresholds, and now a live API mode for
+Anthropic organization usage and spend. Classic.
 
 A fair amount of this was coded with Claude's help. I'm aware of how that
 sounds given what the widget does. I tried to keep resource usage sensible
@@ -30,6 +30,11 @@ category. I like mine. Maybe you will too.
 Shows your Claude session (5-hour rolling window) and weekly usage as two
 live rings in your panel, sidebar, or on the desktop, so you can see the wall
 coming before you run into it face-first.
+
+It also has an API mode: live Anthropic organization usage, token totals,
+cost, per-model breakdown, prompt caching stats, daily average, projections,
+and an optional local cap countdown. Multiple widget instances sync their
+settings automatically, and the color theme can follow KDE's dark/light mode.
 
 **Wherever you put it**
 
@@ -60,7 +65,7 @@ be unreasonable.
 - KDE Plasma 6
 - Python 3
 - `libnotify` (`notify-send`) for notifications
-- A claude.ai account (Pro or Max)
+- A claude.ai account (Pro or Max), or an Anthropic organization Admin API key for API mode
 
 **Installation**
 
@@ -87,6 +92,29 @@ https://github.com/GitGoodFabi/claude-arch-widget
 ---
 
 ## Version history (for store changelog field)
+
+**1.4**
+- Per-model breakdown in API view (top 3 by token volume with spend and %)
+- Prompt cache efficiency stats in API view
+- Daily average and projected monthly spend in API view
+- "All time" window for API mode (last 365 days)
+- Budget mode: show cap countdown for selected window or disable it
+- API ring display: fill for remaining budget or used spend
+- Follow Plasma theme: auto-switch color theme in KDE dark/light mode
+- Light/dark theme pair: set separate themes per Plasma appearance
+- Sync settings between widget instances automatically
+- Extended refresh intervals: 30 min, 1 h, 2 h, 6 h
+- API result cache: shows previous data immediately while refresh runs in background
+- Admin key validation cached — reduces API calls per refresh and HTTP 429 exposure
+
+**1.3**
+- API mode is now live for Anthropic organization Admin API keys
+- API widget shows token totals, spend, model breakdown, prompt caching, daily average, and projection
+- Manual cap countdown can be shown for the selected API window or disabled
+- Admin key validation fixed for current Anthropic key prefixes
+- API refresh behavior hardened against rate limiting
+- API errors now surface real backend messages instead of generic failures
+- API popup layout fixed to avoid overlapping content in smaller widget sizes
 
 **1.2**
 - Widget is now self-contained: Python script bundled inside the plasmoid

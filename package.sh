@@ -47,6 +47,9 @@ cd "$WIDGET_DIR"
 zip -r "../$OUTPUT" . \
     --exclude "*.pyc" \
     --exclude "__pycache__/*" \
+    --exclude "*/__pycache__/*" \
+    --exclude "__pycache__" \
+    --exclude "*/__pycache__" \
     --exclude ".DS_Store" \
     -q
 cd ..

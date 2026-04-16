@@ -19,17 +19,42 @@ PlasmoidItem {
 
     // ── API mode properties ───────────────────────────────────────────────────
     readonly property bool apiMode: Plasmoid.configuration.widgetMode === "api"
-    property string apiTokensDisplay: "—"
-    property string apiCostDisplay:   "—"
-    property string apiBudgetDisplay: "—"
-    property real   apiBudgetPct:     0
-    property bool   apiHasBudget:     false
-    property string apiWindowLabel:   "Monthly"
+    property string apiTokensDisplay:  "—"
+    property string apiCostDisplay:    "—"
+    property string apiBudgetDisplay:  "—"
+    property real   apiBudgetPct:      0
+    property bool   apiHasBudget:      false
+    property string apiWindowLabel:    "Monthly"
+    // Extended API fields
+    property string apiInputDisplay:   "—"
+    property string apiOutputDisplay:  "—"
+    property string apiCacheDisplay:   "—"
+    property string apiSavedDisplay:     ""
+    property string apiRemainingDisplay: ""
+    property string apiDailyDisplay:   "—"
+    property string apiProjectedDisplay: "—"
+    property string apiStatusMessage: ""
+    property int    apiCacheEfficiency: 0
+    property var    apiByModel:        []
 
     // ── Shared ────────────────────────────────────────────────────────────────
     property string errorMsg: ""
     property bool loading: true
     property bool isAuthError: false
+    readonly property int apiMinRefreshSeconds: 120
+    readonly property bool apiHasRenderableData: apiTokensDisplay !== "—" || apiCostDisplay !== "—"
+    property bool _applyingSharedSettings: false
+    property bool _sharedSettingsLoaded: false
+    property string _lastSharedSettingsJson: ""
+    property string _lastSharedRevision: ""
+    property string _lastSyncMtime: ""
+    property string _pendingApiCacheKey: ""
+    property bool _joiningSharedSettings: false
+    readonly property string apiDebugSummary:
+        "DBG cap=" + (apiHasBudget ? "yes" : "no") +
+        " pct=" + Math.round(apiBudgetPct) +
+        " rem=" + (apiRemainingDisplay || "—") +
+        " mode=" + (Plasmoid.configuration.apiBudgetMode || "selected")
 
     // Notification flags — reset on first load to avoid re-firing on plasmashell restart
     property bool _firstLoad: true
@@ -43,6 +68,19 @@ PlasmoidItem {
     property bool _nw95: false
 
     readonly property bool onDesktop: Plasmoid.formFactor === PlasmaCore.Types.Planar
+    readonly property color plasmaBackgroundColor: Kirigami.Theme.backgroundColor
+    readonly property real plasmaBackgroundLuma:
+        0.2126 * plasmaBackgroundColor.r +
+        0.7152 * plasmaBackgroundColor.g +
+        0.0722 * plasmaBackgroundColor.b
+    readonly property bool plasmaDarkMode: plasmaBackgroundLuma < 0.5
+    readonly property string activeThemeKey: {
+        if (Plasmoid.configuration.followPlasmaTheme)
+            return plasmaDarkMode
+                ? (Plasmoid.configuration.darkModeTheme || "violet")
+                : (Plasmoid.configuration.lightModeTheme || "amber")
+        return Plasmoid.configuration.colorTheme || "amber"
+    }
 
     // ── Color themes ──────────────────────────────────────────────────────────
     function makeThemeColors(s, w) {
@@ -58,7 +96,7 @@ PlasmoidItem {
     }
 
     readonly property var theme: {
-        var key = Plasmoid.configuration.colorTheme || "amber"
+        var key = activeThemeKey
         if (key === "custom")
             return makeThemeColors(
                 Plasmoid.configuration.customSessionColor || "#FF7300",
@@ -119,7 +157,9 @@ PlasmoidItem {
         if (root.errorMsg) return root.apiMode ? i18n("Claude API — Error") : i18n("Claude — Error")
         if (root.apiMode) {
             var line1 = root.apiTokensDisplay + " tokens" + (Plasmoid.configuration.apiShowCost ? "   ·   " + root.apiCostDisplay : "")
-            var line2 = root.apiWindowLabel + " · " + (root.apiHasBudget ? Math.round(root.apiBudgetPct) + "% of budget" : i18n("No budget cap"))
+            var line2 = root.apiStatusMessage !== ""
+                ? root.apiStatusMessage
+                : root.apiWindowLabel + " · " + (root.apiHasBudget ? Math.round(root.apiBudgetPct) + "% of cap" : i18n("No cap countdown"))
             return line1 + "\n" + line2
         }
         return "Session " + Math.round(root.sessionPct) + "%   ·   Week " + Math.round(root.weeklyPct) + "%" +
@@ -134,7 +174,7 @@ PlasmoidItem {
         return compactRepresentation
     }
 
-    Component.onCompleted: fetchData()
+    Component.onCompleted: initializeWidget()
     onExpandedChanged: { if (expanded) fetchData() }
 
     function terminalCmd() {
@@ -148,6 +188,173 @@ PlasmoidItem {
         if (term === "wezterm")
             return "wezterm start bash -lc 'claude; exec bash'"
         return term + " -e bash -lc 'claude; exec bash'"
+    }
+
+    function currentModeKey() {
+        return root.apiMode ? "api" : "claudeai"
+    }
+
+    function syncScriptPath() {
+        return Qt.resolvedUrl("../code/widget_sync.py").toString().replace("file://", "")
+    }
+
+    function apiCacheScriptPath() {
+        return Qt.resolvedUrl("../code/api_cache.py").toString().replace("file://", "")
+    }
+
+    function currentApiCacheArgs() {
+        return {
+            window: Plasmoid.configuration.apiTimeWindow || "monthly",
+            currency: Plasmoid.configuration.apiCurrency || "EUR",
+            cap: String(Plasmoid.configuration.apiBudgetCap || 0),
+            capMode: Plasmoid.configuration.apiBudgetMode || "selected"
+        }
+    }
+
+    function applyApiPayload(j) {
+        root.apiStatusMessage = j.message || ""
+        root.apiTokensDisplay = j.tokens.display
+        root.apiBudgetPct = j.budget.pct
+        root.apiHasBudget = j.budget.has_cap
+        root.apiCostDisplay = j.cost.display
+        root.apiBudgetDisplay = j.cost.budget_display
+        root.apiWindowLabel = j.window.charAt(0).toUpperCase() + j.window.slice(1)
+        root.apiInputDisplay = (j.tokens && j.tokens.input_display) || "—"
+        root.apiOutputDisplay = (j.tokens && j.tokens.output_display) || "—"
+        root.apiCacheDisplay = (j.tokens && j.tokens.cache_read_display) || "—"
+        root.apiSavedDisplay = (j.cost && j.cost.saved_display) || ""
+        root.apiRemainingDisplay = (j.cost && j.cost.remaining_display) || ""
+        root.apiDailyDisplay = (j.cost && j.cost.daily_avg_display) || "—"
+        root.apiProjectedDisplay = (j.cost && j.cost.projected_display) || "—"
+        root.apiCacheEfficiency = j.cache_efficiency || 0
+        root.apiByModel = j.by_model || []
+    }
+
+    function primeApiCache() {
+        if (!root.apiMode)
+            return
+        var args = currentApiCacheArgs()
+        root._pendingApiCacheKey = args.window + "|" + args.currency + "|" + args.cap + "|" + args.capMode
+        apiCacheExec.connectSource(
+            "python3 \"" + apiCacheScriptPath() + "\" get " +
+            args.window + " " + args.currency + " " + args.cap + " " + args.capMode
+        )
+    }
+
+    function collectSharedSettings(mode) {
+        var base = {
+            "colorTheme": Plasmoid.configuration.colorTheme || "amber",
+            "followPlasmaTheme": Plasmoid.configuration.followPlasmaTheme,
+            "lightModeTheme": Plasmoid.configuration.lightModeTheme || "amber",
+            "darkModeTheme": Plasmoid.configuration.darkModeTheme || "violet",
+            "customSessionColor": Plasmoid.configuration.customSessionColor || "#FF7300",
+            "customWeeklyColor": Plasmoid.configuration.customWeeklyColor || "#FFB347",
+            "widgetOpacity": Plasmoid.configuration.widgetOpacity,
+            "backgroundOpacity": Plasmoid.configuration.backgroundOpacity,
+            "timerEnabled": Plasmoid.configuration.timerEnabled,
+            "refreshIntervalSeconds": Plasmoid.configuration.refreshIntervalSeconds
+        }
+        if (mode === "api") {
+            base.apiTimeWindow = Plasmoid.configuration.apiTimeWindow || "monthly"
+            base.apiShowCost = Plasmoid.configuration.apiShowCost
+            base.apiCurrency = Plasmoid.configuration.apiCurrency || "EUR"
+            base.apiBudgetCap = Plasmoid.configuration.apiBudgetCap || 0
+            base.apiBudgetMode = Plasmoid.configuration.apiBudgetMode || "selected"
+            base.apiRingDisplay = Plasmoid.configuration.apiRingDisplay || "remaining"
+            return base
+        }
+        base.terminalApp = Plasmoid.configuration.terminalApp || "konsole"
+        base.projectShortcutLabel = Plasmoid.configuration.projectShortcutLabel || ""
+        base.projectShortcutUrl = Plasmoid.configuration.projectShortcutUrl || ""
+        base.minimalView = Plasmoid.configuration.minimalView
+        base.sidebarView = Plasmoid.configuration.sidebarView || "compact"
+        base.scriptPath = Plasmoid.configuration.scriptPath || ""
+        base.desktopShortcuts = Plasmoid.configuration.desktopShortcuts
+        base.notifySession25 = Plasmoid.configuration.notifySession25
+        base.notifySession50 = Plasmoid.configuration.notifySession50
+        base.notifySession80 = Plasmoid.configuration.notifySession80
+        base.notifySession95 = Plasmoid.configuration.notifySession95
+        base.notifyWeekly25 = Plasmoid.configuration.notifyWeekly25
+        base.notifyWeekly50 = Plasmoid.configuration.notifyWeekly50
+        base.notifyWeekly80 = Plasmoid.configuration.notifyWeekly80
+        base.notifyWeekly95 = Plasmoid.configuration.notifyWeekly95
+        return base
+    }
+
+    function applySharedSettings(mode, settings) {
+        if (!settings)
+            return
+        root._applyingSharedSettings = true
+        Plasmoid.configuration.colorTheme = settings.colorTheme || Plasmoid.configuration.colorTheme
+        if (settings.followPlasmaTheme !== undefined)
+            Plasmoid.configuration.followPlasmaTheme = settings.followPlasmaTheme
+        Plasmoid.configuration.lightModeTheme = settings.lightModeTheme || Plasmoid.configuration.lightModeTheme
+        Plasmoid.configuration.darkModeTheme = settings.darkModeTheme || Plasmoid.configuration.darkModeTheme
+        Plasmoid.configuration.customSessionColor = settings.customSessionColor || Plasmoid.configuration.customSessionColor
+        Plasmoid.configuration.customWeeklyColor = settings.customWeeklyColor || Plasmoid.configuration.customWeeklyColor
+        if (settings.widgetOpacity !== undefined)
+            Plasmoid.configuration.widgetOpacity = settings.widgetOpacity
+        if (settings.backgroundOpacity !== undefined)
+            Plasmoid.configuration.backgroundOpacity = settings.backgroundOpacity
+        if (settings.timerEnabled !== undefined)
+            Plasmoid.configuration.timerEnabled = settings.timerEnabled
+        if (settings.refreshIntervalSeconds !== undefined)
+            Plasmoid.configuration.refreshIntervalSeconds = settings.refreshIntervalSeconds
+        if (mode === "api") {
+            Plasmoid.configuration.apiTimeWindow = settings.apiTimeWindow || Plasmoid.configuration.apiTimeWindow
+            if (settings.apiShowCost !== undefined)
+                Plasmoid.configuration.apiShowCost = settings.apiShowCost
+            Plasmoid.configuration.apiCurrency = settings.apiCurrency || Plasmoid.configuration.apiCurrency
+            if (settings.apiBudgetCap !== undefined)
+                Plasmoid.configuration.apiBudgetCap = settings.apiBudgetCap
+            Plasmoid.configuration.apiBudgetMode = settings.apiBudgetMode || Plasmoid.configuration.apiBudgetMode
+            Plasmoid.configuration.apiRingDisplay = settings.apiRingDisplay || Plasmoid.configuration.apiRingDisplay
+        } else {
+            Plasmoid.configuration.terminalApp = settings.terminalApp || Plasmoid.configuration.terminalApp
+            Plasmoid.configuration.projectShortcutLabel = settings.projectShortcutLabel || ""
+            Plasmoid.configuration.projectShortcutUrl = settings.projectShortcutUrl || ""
+            if (settings.minimalView !== undefined)
+                Plasmoid.configuration.minimalView = settings.minimalView
+            Plasmoid.configuration.sidebarView = settings.sidebarView || Plasmoid.configuration.sidebarView
+            Plasmoid.configuration.scriptPath = settings.scriptPath || ""
+            if (settings.desktopShortcuts !== undefined)
+                Plasmoid.configuration.desktopShortcuts = settings.desktopShortcuts
+            if (settings.notifySession25 !== undefined) Plasmoid.configuration.notifySession25 = settings.notifySession25
+            if (settings.notifySession50 !== undefined) Plasmoid.configuration.notifySession50 = settings.notifySession50
+            if (settings.notifySession80 !== undefined) Plasmoid.configuration.notifySession80 = settings.notifySession80
+            if (settings.notifySession95 !== undefined) Plasmoid.configuration.notifySession95 = settings.notifySession95
+            if (settings.notifyWeekly25 !== undefined) Plasmoid.configuration.notifyWeekly25 = settings.notifyWeekly25
+            if (settings.notifyWeekly50 !== undefined) Plasmoid.configuration.notifyWeekly50 = settings.notifyWeekly50
+            if (settings.notifyWeekly80 !== undefined) Plasmoid.configuration.notifyWeekly80 = settings.notifyWeekly80
+            if (settings.notifyWeekly95 !== undefined) Plasmoid.configuration.notifyWeekly95 = settings.notifyWeekly95
+        }
+        root._applyingSharedSettings = false
+        root._lastSharedSettingsJson = JSON.stringify(collectSharedSettings(mode))
+    }
+
+    function saveSharedSettings() {
+        if (!Plasmoid.configuration.syncSettingsByMode || root._applyingSharedSettings || root._joiningSharedSettings)
+            return
+        var mode = currentModeKey()
+        var payload = JSON.stringify(collectSharedSettings(mode))
+        root._lastSharedSettingsJson = payload
+        syncExec.connectSource("python3 \"" + syncScriptPath() + "\" set " + mode + " '" + escapeShellArg(payload) + "'")
+    }
+
+    function loadSharedSettings() {
+        if (!Plasmoid.configuration.syncSettingsByMode) {
+            root._joiningSharedSettings = false
+            root._sharedSettingsLoaded = true
+            primeApiCache()
+            fetchData()
+            return
+        }
+        root._joiningSharedSettings = true
+        syncExec.connectSource("python3 \"" + syncScriptPath() + "\" get " + currentModeKey())
+    }
+
+    function initializeWidget() {
+        loadSharedSettings()
     }
 
     // ── Compact (Panel + Sidebar) ─────────────────────────────────────────────
@@ -194,10 +401,11 @@ PlasmoidItem {
                 var cx = width / 2, cy = height / 2
                 var lw = Math.max(2, width * 0.08)
                 if (root.apiMode) {
-                    // Single ring showing budget percentage (only when cap is set)
                     if (root.apiHasBudget) {
-                        arc(ctx, cx, cy, width * 0.38, lw, 1.0,                      root.theme.sT)
-                        arc(ctx, cx, cy, width * 0.38, lw, root.apiBudgetPct / 100,  root.theme.s)
+                        arc(ctx, cx, cy, width * 0.38, lw, 1.0, root.theme.sT)
+                        arc(ctx, cx, cy, width * 0.38, lw, root.apiBudgetPct / 100, root.theme.s)
+                    } else {
+                        arc(ctx, cx, cy, width * 0.38, lw, 1.0, root.theme.s)
                     }
                 } else {
                     arc(ctx, cx, cy, width * 0.44, lw, 1.0,                   root.theme.wT)
@@ -285,7 +493,7 @@ PlasmoidItem {
 
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: root.loading ? "…" : root.errorMsg ? "!" : root.apiTokensDisplay
+                    text: (root.loading && !root.apiHasRenderableData) ? "…" : root.errorMsg ? "!" : root.apiTokensDisplay
                     color: root.errorMsg ? "#ff5555" : root.theme.s
                     font.pixelSize: parent.bigPx
                     font.bold: true
@@ -293,7 +501,7 @@ PlasmoidItem {
                     lineHeight: parent.bigPx * 1.15
                 }
                 Text {
-                    visible: Plasmoid.configuration.apiShowCost && !root.loading && !root.errorMsg
+                    visible: Plasmoid.configuration.apiShowCost && (!root.loading || root.apiHasRenderableData) && !root.errorMsg
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: root.apiCostDisplay
                     color: root.theme.sDim
@@ -301,6 +509,18 @@ PlasmoidItem {
                     font.weight: Font.Medium
                     lineHeightMode: Text.FixedHeight
                     lineHeight: parent.smallPx * 1.15
+                }
+                Text {
+                    visible: !root.errorMsg
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: root.apiDebugSummary
+                    color: Qt.rgba(1, 1, 1, 0.55)
+                    font.pixelSize: Math.max(5, compactCanvas.width * 0.055)
+                    lineHeightMode: Text.FixedHeight
+                    lineHeight: font.pixelSize * 1.1
+                    width: compactCanvas.width * 1.8
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WrapAnywhere
                 }
             }
         }
@@ -338,7 +558,7 @@ PlasmoidItem {
 
             Text {
                 width: compact.textW
-                text: root.loading ? "…" : root.errorMsg ? "!" : root.apiTokensDisplay
+                text: (root.loading && !root.apiHasRenderableData) ? "…" : root.errorMsg ? "!" : root.apiTokensDisplay
                 color: root.errorMsg ? "#ff5555" : root.theme.s
                 font.pixelSize: Math.round(compact.h * 0.32)
                 font.bold: true
@@ -346,9 +566,18 @@ PlasmoidItem {
             Text {
                 visible: Plasmoid.configuration.apiShowCost
                 width: compact.textW
-                text: root.loading || root.errorMsg ? "" : root.apiCostDisplay
+                text: (root.loading && !root.apiHasRenderableData) || root.errorMsg ? "" : root.apiCostDisplay
                 color: Kirigami.Theme.disabledTextColor
                 font.pixelSize: Math.round(compact.h * 0.22)
+            }
+            Text {
+                visible: !root.errorMsg
+                width: Math.round(compact.h * 3.6)
+                text: root.apiDebugSummary
+                color: Qt.rgba(1, 1, 1, 0.55)
+                font.pixelSize: Math.round(compact.h * 0.14)
+                wrapMode: Text.NoWrap
+                elide: Text.ElideRight
             }
         }
 
@@ -423,10 +652,10 @@ PlasmoidItem {
             !root.apiMode &&
             Plasmoid.configuration.projectShortcutLabel !== "" &&
             Plasmoid.configuration.projectShortcutUrl   !== ""
-        readonly property real buttonsH: root.apiMode ? 0 : (hasProjectShortcut ? 100 : 70)
+        readonly property real buttonsH: root.apiMode ? 44 : (hasProjectShortcut ? 100 : 70)
 
         Layout.minimumWidth:   minimal ? 120 : 220
-        Layout.minimumHeight:  minimal ? 120 : 300
+        Layout.minimumHeight:  minimal ? 120 : (root.apiMode ? 500 : 300)
         Layout.preferredWidth: minimal ? 180 : (onDesktop ? 340 : 280)
         Layout.fillWidth:      true
         Layout.fillHeight:     true
@@ -474,7 +703,7 @@ PlasmoidItem {
             Text {
                 width: parent.width
                 text: root.isAuthError
-                    ? (root.apiMode ? i18n("API key missing or invalid.") : i18n("Session key missing or expired."))
+                    ? (root.apiMode ? i18n("Organization Admin API key missing or invalid.") : i18n("Session key missing or expired."))
                     : root.errorMsg
                 color: "#ff5555"; wrapMode: Text.Wrap
                 font.pixelSize: Math.max(10, fullView.ringDiam * 0.07)
@@ -483,7 +712,7 @@ PlasmoidItem {
                 visible: root.isAuthError
                 width: parent.width
                 text: root.apiMode
-                    ? i18n("Add your Anthropic Admin API key in the widget settings.")
+                    ? i18n("Add an Anthropic organization Admin API key in the widget settings. Individual accounts and standard API keys do not expose Usage & Cost Admin API data.")
                     : i18n("Run setup.sh from the widget repository, or paste your sessionKey from claude.ai cookies.")
                 color: Qt.rgba(1,1,1,0.5); wrapMode: Text.Wrap
                 font.pixelSize: Math.max(9, fullView.ringDiam * 0.06)
@@ -604,15 +833,15 @@ PlasmoidItem {
             }
         }
 
-        // ── API mode: budget ring (shown when a budget cap is configured) ──
+        // ── API mode: always-visible ring; uses cap progress when configured ──
         Canvas {
             id: apiRingCanvas
-            visible: root.errorMsg === "" && root.apiMode && root.apiHasBudget
+            visible: root.errorMsg === "" && root.apiMode
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top:       header.bottom
             anchors.topMargin: fullView.pad / 2
-            width:  fullView.ringDiam
-            height: fullView.ringDiam
+            width:  Math.min(fullView.ringDiam, 110)
+            height: Math.min(fullView.ringDiam, 110)
 
             onPaint: {
                 var ctx = getContext("2d")
@@ -620,11 +849,20 @@ PlasmoidItem {
                 var cx = width / 2, cy = height / 2
                 var lw = Math.max(4, width * 0.055)
                 var r  = width * 0.38
+                var f = Math.min(Math.max(root.apiBudgetPct, 0), 100) / 100
+                if (!root.apiHasBudget) {
+                    ctx.beginPath()
+                    ctx.arc(cx, cy, r, 0, 2 * Math.PI)
+                    ctx.strokeStyle = root.theme.s
+                    ctx.lineWidth = lw
+                    ctx.lineCap = "butt"
+                    ctx.stroke()
+                    return
+                }
                 // Track
                 ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI)
                 ctx.strokeStyle = root.theme.sT; ctx.lineWidth = lw; ctx.lineCap = "butt"; ctx.stroke()
                 // Fill
-                var f = Math.min(Math.max(root.apiBudgetPct, 0), 100) / 100
                 if (f > 0) {
                     ctx.beginPath()
                     if (f >= 1.0)
@@ -639,140 +877,246 @@ PlasmoidItem {
                 target: root
                 function onThemeChanged()        { apiRingCanvas.requestPaint() }
                 function onApiBudgetPctChanged() { apiRingCanvas.requestPaint() }
+                function onApiHasBudgetChanged() { apiRingCanvas.requestPaint() }
                 function onLoadingChanged()      { apiRingCanvas.requestPaint() }
             }
             onWidthChanged: requestPaint()
 
-            // Inside the ring: budget percentage + spend/cap
+            // Inside the ring: cap details when configured, otherwise a neutral API label
             Column {
                 anchors.centerIn: parent
                 spacing: 3
 
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: root.loading ? "…" : Math.round(root.apiBudgetPct) + "%"
+                    text: root.apiHasBudget
+                        ? ((root.loading && !root.apiHasRenderableData)
+                            ? "…"
+                            : (Plasmoid.configuration.apiRingDisplay === "remaining"
+                                ? root.apiRemainingDisplay
+                                : Math.round(root.apiBudgetPct) + "%"))
+                        : i18n("API")
                     color: root.theme.s
-                    font.pixelSize: Math.max(11, apiRingCanvas.width * 0.13)
+                    font.pixelSize: root.apiHasBudget
+                        ? (Plasmoid.configuration.apiRingDisplay === "remaining"
+                            ? Math.max(12, apiRingCanvas.width * 0.11)
+                            : Math.max(22, apiRingCanvas.width * 0.22))
+                        : Math.max(14, apiRingCanvas.width * 0.16)
                     font.bold: true
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    width: apiRingCanvas.width * 0.72
                 }
                 Text {
-                    visible: Plasmoid.configuration.apiShowCost
+                    visible: root.apiHasBudget && Plasmoid.configuration.apiShowCost
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: root.apiBudgetDisplay
-                    color: root.theme.sLbl
-                    font.pixelSize: Math.max(6, apiRingCanvas.width * 0.052)
+                    color: root.theme.s
+                    font.pixelSize: Math.max(9, apiRingCanvas.width * 0.08)
+                    opacity: 1.0
                 }
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: i18n("BUDGET")
-                    color: root.theme.sLbl
-                    font.pixelSize: Math.max(5, apiRingCanvas.width * 0.042)
+                    text: root.apiHasBudget
+                        ? (Plasmoid.configuration.apiRingDisplay === "remaining" ? i18n("LEFT") : i18n("CAP"))
+                        : root.apiWindowLabel.toUpperCase()
+                    color: root.theme.s
+                    font.pixelSize: root.apiHasBudget
+                        ? Math.max(7, apiRingCanvas.width * 0.065)
+                        : Math.max(7, apiRingCanvas.width * 0.08)
                     font.letterSpacing: 1.5
+                    opacity: 0.55
                 }
             }
         }
 
-        // ── API mode: token + cost stats (with budget cap → below ring) ──
+        // ── API mode: headline tokens + cost (below ring / below header when no cap) ──
         Column {
-            visible: root.errorMsg === "" && root.apiMode && root.apiHasBudget
+            id: apiStats
+            visible: root.errorMsg === "" && root.apiMode
+            anchors.top:              apiRingCanvas.bottom
+            anchors.topMargin:        10
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: apiRingCanvas.bottom
-            anchors.topMargin: 10
-            spacing: 4
-
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 16
-
-                Column {
-                    spacing: 2
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: root.loading ? "…" : root.apiTokensDisplay
-                        color: root.theme.s
-                        font.pixelSize: Math.max(14, fullView.ringDiam * 0.11)
-                        font.bold: true
-                    }
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: i18n("TOKENS")
-                        color: root.theme.sLbl
-                        font.pixelSize: Math.max(6, fullView.ringDiam * 0.042)
-                        font.letterSpacing: 1.5
-                    }
-                }
-
-                Column {
-                    visible: Plasmoid.configuration.apiShowCost && !root.loading && !root.errorMsg
-                    spacing: 2
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: root.apiCostDisplay
-                        color: root.theme.w
-                        font.pixelSize: Math.max(14, fullView.ringDiam * 0.11)
-                        font.bold: true
-                    }
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: i18n("COST")
-                        color: root.theme.wDim
-                        font.pixelSize: Math.max(6, fullView.ringDiam * 0.042)
-                        font.letterSpacing: 1.5
-                    }
-                }
-            }
+            spacing: 3
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: root.apiWindowLabel
-                color: Qt.rgba(1,1,1,0.3)
-                font.pixelSize: Math.max(8, fullView.ringDiam * 0.048)
-                font.letterSpacing: 0.5
-            }
-        }
-
-        // ── API mode: token + cost stats (no budget cap → centered) ──
-        Column {
-            visible: root.errorMsg === "" && root.apiMode && !root.apiHasBudget
-            anchors.centerIn: parent
-            spacing: 6
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: root.loading ? "…" : root.apiTokensDisplay
+                text: (root.loading && !root.apiHasRenderableData) ? "…" : root.apiTokensDisplay
                 color: root.theme.s
-                font.pixelSize: Math.max(36, fullView.ringDiam * 0.32)
+                font.pixelSize: root.apiHasBudget
+                    ? Math.max(14, fullView.ringDiam * 0.12)
+                    : Math.max(32, fullView.ringDiam * 0.28)
                 font.bold: true
             }
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: i18n("TOKENS")
                 color: root.theme.sLbl
-                font.pixelSize: Math.max(9, fullView.ringDiam * 0.058)
-                font.letterSpacing: 2
+                font.pixelSize: Math.max(7, fullView.ringDiam * 0.044)
+                font.letterSpacing: 1.5
             }
-
-            Rectangle {
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: Math.max(60, fullView.ringDiam * 0.4)
-                height: 1
-                color: Qt.rgba(1,1,1,0.08)
-            }
-
             Text {
-                visible: Plasmoid.configuration.apiShowCost && !root.loading && !root.errorMsg
+                visible: Plasmoid.configuration.apiShowCost && (!root.loading || root.apiHasRenderableData)
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: root.apiCostDisplay
-                color: root.theme.w
-                font.pixelSize: Math.max(26, fullView.ringDiam * 0.23)
+                color: "white"
+                font.pixelSize: root.apiHasBudget
+                    ? Math.max(12, fullView.ringDiam * 0.09)
+                    : Math.max(22, fullView.ringDiam * 0.18)
                 font.bold: true
             }
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: root.apiWindowLabel
-                color: Qt.rgba(1,1,1,0.3)
-                font.pixelSize: Math.max(9, fullView.ringDiam * 0.052)
-                font.letterSpacing: 1
+                text: root.apiDebugSummary
+                color: Qt.rgba(1, 1, 1, 0.6)
+                font.pixelSize: 10
+                wrapMode: Text.WrapAnywhere
+                horizontalAlignment: Text.AlignHCenter
+                width: fullView.width - (fullView.pad * 2)
+            }
+        }
+
+        // ── API mode: legend/details (scrollable to avoid overlap in smaller popups) ──
+        Flickable {
+            id: apiLegendScroll
+            visible: root.errorMsg === "" && root.apiMode && (!root.loading || root.apiHasRenderableData)
+            anchors {
+                top: apiStats.bottom
+                topMargin: 10
+                bottom: apiButtons.top
+                bottomMargin: 8
+                left: parent.left
+                right: parent.right
+                leftMargin: fullView.pad
+                rightMargin: fullView.pad
+            }
+            contentWidth: width
+            contentHeight: apiLegend.implicitHeight
+            clip: true
+
+            Column {
+                id: apiLegend
+                width: apiLegendScroll.width
+                spacing: 4
+
+                Rectangle { width: parent.width; height: 1; color: Qt.rgba(1,1,1,0.08) }
+                Item { width: 1; height: 2 }
+
+                Text {
+                    visible: root.apiStatusMessage !== ""
+                    width: parent.width
+                    text: root.apiStatusMessage
+                    color: Qt.rgba(1,1,1,0.55)
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+
+                Row {
+                    width: parent.width; spacing: 6
+                    Rectangle { width:8; height:8; radius:4; color:root.theme.s; anchors.verticalCenter:parent.verticalCenter }
+                    Text { text: i18n("Input");  color:"white"; font.pixelSize:11; width:72 }
+                    Text { text: root.apiInputDisplay; color:root.theme.s; font.pixelSize:11; font.bold:true }
+                }
+                Row {
+                    width: parent.width; spacing: 6
+                    Rectangle { width:8; height:8; radius:4; color:root.theme.w; anchors.verticalCenter:parent.verticalCenter }
+                    Text { text: i18n("Output"); color:"white"; font.pixelSize:11; width:72 }
+                    Text { text: root.apiOutputDisplay; color:root.theme.w; font.pixelSize:11; font.bold:true }
+                }
+                Row {
+                    width: parent.width; spacing: 6
+                    Rectangle { width:8; height:8; radius:4; color:Qt.rgba(1,1,1,0.28); anchors.verticalCenter:parent.verticalCenter }
+                    Text { text: i18n("Cache read"); color:"white"; font.pixelSize:11; width:72 }
+                    Text { text: root.apiCacheDisplay; color:Qt.rgba(1,1,1,0.55); font.pixelSize:11; font.bold:true }
+                    Text { text: root.apiCacheEfficiency + "% hit"; color:Qt.rgba(1,1,1,0.35); font.pixelSize:10; anchors.verticalCenter:parent.verticalCenter }
+                }
+                Text {
+                    visible: root.apiCacheEfficiency > 0 && root.apiSavedDisplay !== ""
+                    width: parent.width
+                    text: root.apiSavedDisplay + " via prompt caching"
+                    color: Qt.rgba(1,1,1,0.28)
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                Text {
+                    visible: root.apiHasBudget && root.apiRemainingDisplay !== ""
+                    width: parent.width
+                    text: root.apiRemainingDisplay
+                    color: Qt.rgba(1,1,1,0.5)
+                    font.pixelSize: 10
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                }
+
+                Rectangle { width: parent.width; height: 1; color: Qt.rgba(1,1,1,0.08) }
+                Item { width: 1; height: 2 }
+
+                Repeater {
+                    model: root.apiByModel
+                    Row {
+                        width: parent.width; spacing: 6
+                        Rectangle { width:8; height:8; radius:4; color:root.theme.s; opacity: index === 0 ? 1.0 : 0.5; anchors.verticalCenter:parent.verticalCenter }
+                        Text { text: modelData.display; color:"white"; font.pixelSize:11; width:72; elide:Text.ElideRight }
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            height: 4; radius: 2; color: root.theme.s; opacity: 0.55
+                            width: Math.max(2, (parent.width - 8 - 6 - 72 - 6 - 52 - 6) * modelData.pct / 100)
+                        }
+                        Text {
+                            text: modelData.cost_display
+                            color:Qt.rgba(1,1,1,0.45)
+                            font.pixelSize:11
+                            width:52
+                            horizontalAlignment:Text.AlignRight
+                            anchors.verticalCenter:parent.verticalCenter
+                        }
+                    }
+                }
+
+                Rectangle { width: parent.width; height: 1; color: Qt.rgba(1,1,1,0.08) }
+                Item { width: 1; height: 2 }
+
+                Row {
+                    visible: Plasmoid.configuration.apiShowCost
+                    width: parent.width; spacing: 6
+                    Text { text: i18n("Daily avg"); color:"white"; font.pixelSize:11; width:72 }
+                    Text { text: root.apiDailyDisplay; color:root.theme.w; font.pixelSize:11; font.bold:true }
+                    Text { text: "·"; color:Qt.rgba(1,1,1,0.3); font.pixelSize:11; leftPadding: 4 }
+                    Text { text: i18n("Projected"); color:Qt.rgba(1,1,1,0.5); font.pixelSize:11; leftPadding: 4 }
+                    Text { text: root.apiProjectedDisplay; color:Qt.rgba(1,1,1,0.7); font.pixelSize:11; font.bold:true }
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: root.apiWindowLabel
+                    color: Qt.rgba(1,1,1,0.22)
+                    font.pixelSize: 9
+                    font.letterSpacing: 0.5
+                }
+            }
+        }
+
+        // ── API mode: quick links (mirrors claude.ai buttons — anchored to bottom) ──
+        Column {
+            id: apiButtons
+            visible: !fullView.minimal && root.apiMode
+            anchors { bottom: parent.bottom; left: parent.left; right: parent.right
+                      margins: fullView.pad; bottomMargin: fullView.pad }
+            spacing: 5
+
+            Row {
+                width: parent.width; spacing: 5
+                PlasmaComponents.Button {
+                    width: (apiButtons.width - 5) / 2
+                    text: i18n("API Console"); icon.name: "internet-web-browser"; font.pixelSize: 10
+                    onClicked: { Qt.openUrlExternally("https://console.anthropic.com"); root.expanded = false }
+                    PlasmaComponents.ToolTip { text: "console.anthropic.com" }
+                }
+                PlasmaComponents.Button {
+                    width: (apiButtons.width - 5) / 2
+                    text: i18n("Billing"); icon.name: "utilities-system-monitor"; font.pixelSize: 10
+                    onClicked: { Qt.openUrlExternally("https://console.anthropic.com/settings/billing"); root.expanded = false }
+                    PlasmaComponents.ToolTip { text: i18n("Open billing & usage page") }
+                }
             }
         }
 
@@ -885,30 +1229,32 @@ PlasmoidItem {
                 root.errorMsg = (data["stderr"] || i18n("Script failed")).trim()
                 return
             }
-            if (data["exit code"] !== 0) {
-                root.errorMsg = (data["stderr"] || i18n("Script failed")).trim()
-                return
-            }
             try {
                 var j = JSON.parse(out)
                 if (j.error) {
                     root.errorMsg = j.error
                     root.isAuthError = j.error.toLowerCase().indexOf("session key") !== -1
                         || j.error.toLowerCase().indexOf("api key") !== -1
+                        || j.error.toLowerCase().indexOf("organization") !== -1
                         || j.error.indexOf("401") !== -1
                         || j.error.indexOf("403") !== -1
                     return
                 }
+                if (data["exit code"] !== 0) {
+                    root.errorMsg = (data["stderr"] || i18n("Script failed")).trim()
+                    return
+                }
                 root.errorMsg = ""
                 if (j.mode === "api") {
-                    root.apiTokensDisplay = j.tokens.display
-                    root.apiBudgetPct     = j.budget.pct
-                    root.apiHasBudget     = j.budget.has_cap
-                    root.apiCostDisplay   = j.cost.display
-                    root.apiBudgetDisplay = j.cost.budget_display
-                    root.apiWindowLabel   = j.window.charAt(0).toUpperCase() + j.window.slice(1)
-                    apiRingCanvas.requestPaint()
+                    applyApiPayload(j)
+                    var args = currentApiCacheArgs()
+                    apiCacheExec.connectSource(
+                        "python3 \"" + apiCacheScriptPath() + "\" set " +
+                        args.window + " " + args.currency + " " + args.cap + " " + args.capMode +
+                        " '" + escapeShellArg(JSON.stringify(j)) + "'"
+                    )
                 } else {
+                    root.apiStatusMessage = ""
                     root.sessionPct      = j.session.utilization
                     root.sessionResetsIn = j.session.resets_in
                     root.sessionResetsAt = j.session.resets_at
@@ -918,7 +1264,80 @@ PlasmoidItem {
                     checkNotifications()
                 }
             } catch(e) {
-                root.errorMsg = i18n("Parse error: %1", e)
+                root.errorMsg = "Parse error: " + String(e)
+            }
+        }
+    }
+
+    Plasma5Support.DataSource {
+        id: syncExec
+        engine: "executable"
+        connectedSources: []
+        onNewData: function(source, data) {
+            disconnectSource(source)
+            var out = (data["stdout"] || "").trim()
+            if (!out.startsWith("{")) {
+                root._joiningSharedSettings = false
+                if (!root._sharedSettingsLoaded) {
+                    root._sharedSettingsLoaded = true
+                    fetchData()
+                }
+                return
+            }
+            try {
+                var j = JSON.parse(out)
+                if (j.ok && (j.action === "get" || j.action === "set")) {
+                    var sharedJson = JSON.stringify(j.settings || {})
+                    root._lastSharedRevision = j.revision || ""
+                    if (j.found && sharedJson !== root._lastSharedSettingsJson)
+                        applySharedSettings(j.mode, j.settings || {})
+                    else if (!j.found) {
+                        root._joiningSharedSettings = false
+                        saveSharedSettings()
+                    }
+                    root._joiningSharedSettings = false
+                    if (!root._sharedSettingsLoaded) {
+                        root._sharedSettingsLoaded = true
+                        primeApiCache()
+                        fetchData()
+                    }
+                }
+            } catch (e) {
+                root._joiningSharedSettings = false
+            }
+        }
+    }
+
+    Plasma5Support.DataSource {
+        id: syncWatchExec
+        engine: "executable"
+        connectedSources: []
+        onNewData: function(source, data) {
+            disconnectSource(source)
+            if (!Plasmoid.configuration.syncSettingsByMode)
+                return
+            var mtime = (data["stdout"] || "0").trim()
+            if (mtime !== "0" && mtime !== root._lastSyncMtime) {
+                root._lastSyncMtime = mtime
+                syncExec.connectSource("python3 \"" + syncScriptPath() + "\" get " + currentModeKey())
+            }
+        }
+    }
+
+    Plasma5Support.DataSource {
+        id: apiCacheExec
+        engine: "executable"
+        connectedSources: []
+        onNewData: function(source, data) {
+            disconnectSource(source)
+            var out = (data["stdout"] || "").trim()
+            if (!out.startsWith("{"))
+                return
+            try {
+                var j = JSON.parse(out)
+                if (j.ok && j.action === "get" && j.found && j.payload && j.payload.mode === "api")
+                    applyApiPayload(j.payload)
+            } catch (e) {
             }
         }
     }
@@ -990,22 +1409,22 @@ PlasmoidItem {
         root.isAuthError = false
         if (root.apiMode) {
             var apiKey = (Plasmoid.configuration.apiKey || "").trim()
-            if (!apiKey) {
-                root.loading  = false
-                root.errorMsg = i18n("No API key configured.")
-                root.isAuthError = true
-                return
-            }
             var window   = Plasmoid.configuration.apiTimeWindow || "monthly"
             var currency = Plasmoid.configuration.apiCurrency   || "EUR"
             var cap      = Plasmoid.configuration.apiBudgetCap  || 0
+            var capMode  = Plasmoid.configuration.apiBudgetMode || "selected"
             var apiPath  = Qt.resolvedUrl("../code/api_usage.py").toString().replace("file://", "")
-            executable.connectSource(
-                "mkdir -p ~/.config/claude-widget && " +
-                "printf '%s' '" + escapeShellArg(apiKey) + "' > ~/.config/claude-widget/api_key.txt && " +
-                "chmod 600 ~/.config/claude-widget/api_key.txt && " +
-                "python3 \"" + apiPath + "\" " + window + " " + currency + " " + cap
-            )
+            var cmd = ""
+            if (apiKey !== "") {
+                cmd =
+                    "mkdir -p ~/.config/claude-widget && " +
+                    "printf '%s' '" + escapeShellArg(apiKey) + "' > ~/.config/claude-widget/api_key.txt && " +
+                    "chmod 600 ~/.config/claude-widget/api_key.txt && "
+                // Keep the runtime key on disk, but clear the plasmoid config copy.
+                Plasmoid.configuration.apiKey = ""
+            }
+            cmd += "python3 \"" + apiPath + "\" " + window + " " + currency + " " + cap + " " + capMode
+            executable.connectSource(cmd)
         } else {
             var path = (Plasmoid.configuration.scriptPath || "").trim()
             if (!path) {
@@ -1016,9 +1435,76 @@ PlasmoidItem {
     }
 
     Timer {
-        interval: Math.max(5, Plasmoid.configuration.refreshIntervalSeconds) * 1000
+        id: sharedSettingsSaveTimer
+        interval: 250
+        repeat: false
+        onTriggered: saveSharedSettings()
+    }
+
+    Timer {
+        id: syncPollTimer
+        interval: 5000
+        running: Plasmoid.configuration.syncSettingsByMode
+        repeat: true
+        onTriggered: {
+            syncWatchExec.connectSource(
+                "stat -c %Y ~/.config/claude-widget/mode_sync.json 2>/dev/null || echo 0"
+            )
+        }
+    }
+
+    Timer {
+        interval: Math.max(root.apiMode ? root.apiMinRefreshSeconds : 5,
+                           Plasmoid.configuration.refreshIntervalSeconds) * 1000
         running: Plasmoid.configuration.timerEnabled
         repeat: true
         onTriggered: fetchData()
+    }
+
+    Connections {
+        target: Plasmoid.configuration
+        function onWidgetModeChanged() {
+            if (root._applyingSharedSettings)
+                return
+            if (root.apiMode)
+                primeApiCache()
+            loadSharedSettings()
+        }
+        function onSyncSettingsByModeChanged() {
+            if (root._applyingSharedSettings)
+                return
+            if (Plasmoid.configuration.syncSettingsByMode)
+                loadSharedSettings()
+        }
+        function onApiTimeWindowChanged() { primeApiCache(); sharedSettingsSaveTimer.restart() }
+        function onApiShowCostChanged() { sharedSettingsSaveTimer.restart() }
+        function onApiCurrencyChanged() { primeApiCache(); sharedSettingsSaveTimer.restart() }
+        function onApiBudgetCapChanged() { primeApiCache(); sharedSettingsSaveTimer.restart() }
+        function onApiBudgetModeChanged() { primeApiCache(); sharedSettingsSaveTimer.restart() }
+        function onColorThemeChanged() { sharedSettingsSaveTimer.restart() }
+        function onFollowPlasmaThemeChanged() { sharedSettingsSaveTimer.restart() }
+        function onLightModeThemeChanged() { sharedSettingsSaveTimer.restart() }
+        function onDarkModeThemeChanged() { sharedSettingsSaveTimer.restart() }
+        function onCustomSessionColorChanged() { sharedSettingsSaveTimer.restart() }
+        function onCustomWeeklyColorChanged() { sharedSettingsSaveTimer.restart() }
+        function onWidgetOpacityChanged() { sharedSettingsSaveTimer.restart() }
+        function onBackgroundOpacityChanged() { sharedSettingsSaveTimer.restart() }
+        function onTerminalAppChanged() { sharedSettingsSaveTimer.restart() }
+        function onTimerEnabledChanged() { sharedSettingsSaveTimer.restart() }
+        function onRefreshIntervalSecondsChanged() { sharedSettingsSaveTimer.restart() }
+        function onProjectShortcutLabelChanged() { sharedSettingsSaveTimer.restart() }
+        function onProjectShortcutUrlChanged() { sharedSettingsSaveTimer.restart() }
+        function onMinimalViewChanged() { sharedSettingsSaveTimer.restart() }
+        function onSidebarViewChanged() { sharedSettingsSaveTimer.restart() }
+        function onScriptPathChanged() { sharedSettingsSaveTimer.restart() }
+        function onDesktopShortcutsChanged() { sharedSettingsSaveTimer.restart() }
+        function onNotifySession25Changed() { sharedSettingsSaveTimer.restart() }
+        function onNotifySession50Changed() { sharedSettingsSaveTimer.restart() }
+        function onNotifySession80Changed() { sharedSettingsSaveTimer.restart() }
+        function onNotifySession95Changed() { sharedSettingsSaveTimer.restart() }
+        function onNotifyWeekly25Changed() { sharedSettingsSaveTimer.restart() }
+        function onNotifyWeekly50Changed() { sharedSettingsSaveTimer.restart() }
+        function onNotifyWeekly80Changed() { sharedSettingsSaveTimer.restart() }
+        function onNotifyWeekly95Changed() { sharedSettingsSaveTimer.restart() }
     }
 }
