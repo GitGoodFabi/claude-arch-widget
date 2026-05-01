@@ -88,7 +88,8 @@ Item {
         id: configPage
         anchors { top: parent.top; left: parent.left; right: parent.right; bottom: parent.bottom }
 
-    readonly property bool isApiMode: modeCombo.currentValue === "api"
+    readonly property bool isApiMode:   modeCombo.currentValue === "api"
+    readonly property bool isOauthMode: modeCombo.currentValue === "oauth"
 
     QtObject {
         id: budgetCapValue
@@ -102,14 +103,24 @@ Item {
         textRole: "label"
         valueRole: "value"
         model: [
-            { label: i18n("Claude.ai  (Pro / Max)"), value: "claudeai" },
-            { label: i18n("Anthropic API"),           value: "api"      }
+            { label: i18n("Claude Code  (OAuth)"),    value: "oauth"    },
+            { label: i18n("Claude.ai  (Pro / Max)"),  value: "claudeai" },
+            { label: i18n("Anthropic API"),            value: "api"      }
         ]
         Component.onCompleted: {
             for (var i = 0; i < model.length; i++) {
                 if (model[i].value === cfg_widgetMode) { currentIndex = i; break }
             }
         }
+    }
+
+    PlasmaComponents.Label {
+        visible: configPage.isOauthMode
+        Kirigami.FormData.label: ""
+        text: i18n("Reads ~/.claude/.credentials.json automatically.\nRequires Claude Code CLI to be installed and logged in.")
+        wrapMode: Text.WordWrap
+        opacity: 0.7
+        Layout.fillWidth: true
     }
 
     Row {
