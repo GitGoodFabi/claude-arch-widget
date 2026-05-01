@@ -18,7 +18,9 @@ PlasmoidItem {
     property string weeklyResetsAt: ""
 
     // ── API mode properties ───────────────────────────────────────────────────
-    readonly property bool apiMode: Plasmoid.configuration.widgetMode === "api"
+    readonly property bool apiMode:   Plasmoid.configuration.widgetMode === "api"
+    readonly property bool oauthMode: Plasmoid.configuration.widgetMode === "oauth"
+    property string planTier: ""
     property string apiTokensDisplay:  "—"
     property string apiCostDisplay:    "—"
     property string apiBudgetDisplay:  "—"
@@ -703,7 +705,11 @@ PlasmoidItem {
             Text {
                 width: parent.width
                 text: root.isAuthError
-                    ? (root.apiMode ? i18n("Organization Admin API key missing or invalid.") : i18n("Session key missing or expired."))
+                    ? (root.apiMode
+                        ? i18n("Organization Admin API key missing or invalid.")
+                        : root.oauthMode
+                            ? i18n("Claude Code not logged in.")
+                            : i18n("Session key missing or expired."))
                     : root.errorMsg
                 color: "#ff5555"; wrapMode: Text.Wrap
                 font.pixelSize: Math.max(10, fullView.ringDiam * 0.07)
@@ -713,7 +719,9 @@ PlasmoidItem {
                 width: parent.width
                 text: root.apiMode
                     ? i18n("Add an Anthropic organization Admin API key in the widget settings. Individual accounts and standard API keys do not expose Usage & Cost Admin API data.")
-                    : i18n("Run setup.sh from the widget repository, or paste your sessionKey from claude.ai cookies.")
+                    : root.oauthMode
+                        ? i18n("Run `claude` in a terminal to log in with Claude Code.")
+                        : i18n("Run setup.sh from the widget repository, or paste your sessionKey from claude.ai cookies.")
                 color: Qt.rgba(1,1,1,0.5); wrapMode: Text.Wrap
                 font.pixelSize: Math.max(9, fullView.ringDiam * 0.06)
             }
@@ -724,7 +732,9 @@ PlasmoidItem {
                 font.pixelSize: 10
                 onClicked: Qt.openUrlExternally(root.apiMode
                     ? "https://console.anthropic.com/settings/keys"
-                    : "https://github.com/GitGoodFabi/claude-arch-widget#installation")
+                    : root.oauthMode
+                        ? "https://claude.ai/login"
+                        : "https://github.com/GitGoodFabi/claude-arch-widget#installation")
             }
         }
 
@@ -1236,6 +1246,8 @@ PlasmoidItem {
                     root.isAuthError = j.error.toLowerCase().indexOf("session key") !== -1
                         || j.error.toLowerCase().indexOf("api key") !== -1
                         || j.error.toLowerCase().indexOf("organization") !== -1
+                        || j.error.toLowerCase().indexOf("credentials.json") !== -1
+                        || j.error.toLowerCase().indexOf("token") !== -1
                         || j.error.indexOf("401") !== -1
                         || j.error.indexOf("403") !== -1
                     return
@@ -1261,6 +1273,7 @@ PlasmoidItem {
                     root.weeklyPct       = j.weekly.utilization
                     root.weeklyResetsIn  = j.weekly.resets_in
                     root.weeklyResetsAt  = j.weekly.resets_at
+                    if (j.plan !== undefined) root.planTier = j.plan
                     checkNotifications()
                 }
             } catch(e) {
@@ -1427,10 +1440,10 @@ PlasmoidItem {
             executable.connectSource(cmd)
         } else {
             var path = (Plasmoid.configuration.scriptPath || "").trim()
-            if (!path) {
+            if (!path)
                 path = Qt.resolvedUrl("../code/claude_usage.py").toString().replace("file://", "")
-            }
-            executable.connectSource("python3 \"" + path + "\"")
+            var args = root.oauthMode ? " oauth" : ""
+            executable.connectSource("python3 \"" + path + "\"" + args)
         }
     }
 
