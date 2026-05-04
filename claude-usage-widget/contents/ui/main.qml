@@ -713,7 +713,7 @@ PlasmoidItem {
                 width: parent.width
                 text: root.apiMode
                     ? i18n("Add an Anthropic organization Admin API key in the widget settings. Individual accounts and standard API keys do not expose Usage & Cost Admin API data.")
-                    : i18n("Run setup.sh from the widget repository, or paste your sessionKey from claude.ai cookies.")
+                    : i18n("Open widget settings and click 'Extract from browser' to refresh automatically, or paste your sessionKey from claude.ai cookies.")
                 color: Qt.rgba(1,1,1,0.5); wrapMode: Text.Wrap
                 font.pixelSize: Math.max(9, fullView.ringDiam * 0.06)
             }

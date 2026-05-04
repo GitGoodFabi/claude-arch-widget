@@ -2,6 +2,16 @@
 
 All notable changes to Claude Usage Monitor are documented here.
 
+## [1.5] - 2026-05-04
+
+### Added
+- **Extract from browser** button in widget settings (Claude.ai mode): re-reads the `sessionKey` cookie from Firefox/Chromium/Brave/Edge and saves it without leaving the settings dialog. No more re-running `setup.sh` to refresh an expired session.
+- `extract_cookie.py` is now bundled inside the plasmoid package so the button works out of the box.
+
+### Fixed
+- Expired session keys now surface as `"Session key has expired — open widget settings and click 'Extract from browser'"` instead of the cryptic JSON parse error `"Expecting value: line 1 column 1 (char 0)"`.
+- Auth-error helper text now points users at the new in-widget button instead of `setup.sh`.
+
 ## [1.4] - 2026-04-16
 
 ### Added

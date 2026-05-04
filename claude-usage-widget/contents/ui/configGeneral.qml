@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
+import org.kde.plasma.plasma5support as Plasma5Support
 import org.kde.kirigami as Kirigami
 import org.kde.kquickcontrols as KQuickControls
 
@@ -83,6 +84,27 @@ Item {
     property alias cfg_notifyWeekly80:  notifyW80.checked
     property alias cfg_notifyWeekly95:  notifyW95.checked
     property alias cfg_desktopShortcuts: desktopShortcutsToggle.checked
+
+    Plasma5Support.DataSource {
+        id: cookieExtractExec
+        engine: "executable"
+        connectedSources: []
+        onNewData: function(source, data) {
+            disconnectSource(source)
+            var out = (data["stdout"] || "").trim()
+            try {
+                var j = JSON.parse(out)
+                cookieStatus.isSuccess = j.ok === true
+                cookieStatus.text = j.ok
+                    ? i18n("Session key saved ✓")
+                    : i18n("Not found — log in to claude.ai first")
+            } catch(e) {
+                cookieStatus.isSuccess = false
+                cookieStatus.text = i18n("Script error")
+            }
+            extractButton.enabled = true
+        }
+    }
 
     Kirigami.FormLayout {
         id: configPage
@@ -445,6 +467,40 @@ Item {
         visible: !configPage.isApiMode
         Kirigami.FormData.label: i18n("Project URL:")
         placeholderText: "https://claude.ai/project/..."
+    }
+
+    // ── Session key ───────────────────────────────────────────────────────────
+    Row {
+        visible: !configPage.isApiMode
+        Kirigami.FormData.label: i18n("Session key:")
+        spacing: 8
+
+        PlasmaComponents.Button {
+            id: extractButton
+            text: i18n("Extract from browser")
+            icon.name: "download"
+            onClicked: {
+                extractButton.enabled = false
+                cookieStatus.isSuccess = true
+                cookieStatus.text = i18n("Searching…")
+                var scriptPath = Qt.resolvedUrl("../code/extract_cookie.py").toString().replace("file://", "")
+                cookieExtractExec.connectSource(
+                    "(mkdir -p ~/.config/claude-widget && " +
+                    "python3 \"" + scriptPath + "\" 2>/dev/null > /tmp/.claude_session_tmp && " +
+                    "[ -s /tmp/.claude_session_tmp ] && " +
+                    "mv /tmp/.claude_session_tmp ~/.config/claude-widget/session.txt && " +
+                    "echo '{\"ok\":true}') || echo '{\"ok\":false}'"
+                )
+            }
+        }
+
+        PlasmaComponents.Label {
+            id: cookieStatus
+            property bool isSuccess: true
+            text: ""
+            color: isSuccess ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
+            anchors.verticalCenter: parent.verticalCenter
+        }
     }
 
     // ── Script path (advanced) ────────────────────────────────────────────────

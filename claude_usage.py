@@ -44,7 +44,10 @@ def make_request(url, session_key):
     req.add_header("Origin", "https://claude.ai")
     req.add_header("anthropic-client-platform", "web_claude_ai")
     with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read())
+        body = resp.read()
+        if not body or body[:1] not in (b"{", b"["):
+            raise ValueError("Session key has expired — open widget settings and click 'Extract from browser'")
+        return json.loads(body)
 
 
 def main():
