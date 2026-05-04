@@ -2,6 +2,18 @@
 
 All notable changes to Claude Usage Monitor are documented here.
 
+## [1.6] - 2026-05-04
+
+### Added
+- **In-widget update button** for Claude.ai mode: pull the latest git changes from the repo path recorded by `setup.sh`, reinstall the plasmoid files, and restart Plasma without re-running `setup.sh`
+
+### Fixed
+- `setup.sh` now fully replaces the installed plasmoid directory before copying files, preventing stale QML/Python files from surviving upgrades
+- `setup.sh` now restarts Plasma more reliably on KDE 6 / SteamOS by preferring `kstart6`, falling back to `kstart`, then `plasmashell --replace`
+- `setup.sh` now records the local clone path automatically, so the widget no longer asks users for a manual repository path
+- Settings page is now scrollable, so options remain reachable on small screens, high DPI, or large font scaling
+- Settings dropdowns now force readable text/highlight colors in dark Plasma themes
+
 ## [1.5] - 2026-05-04
 
 ### Added

@@ -36,7 +36,8 @@ bash setup.sh
 `setup.sh` will:
 1. **Auto-extract** your `sessionKey` cookie from Firefox or Chrome/Chromium — no manual copy-paste needed in most cases
 2. Test the data fetch against the claude.ai API
-3. Install the Plasma widget
+3. Install the Plasma widget and fully replace stale files from older versions
+4. Record the local git clone path for in-widget updates
 4. Restart Plasma shell
 
 Then: right-click your panel or desktop → **Add Widgets** → search for **Claude Usage**.
@@ -58,6 +59,17 @@ The key is stored at `~/.config/claude-widget/session.txt` (chmod 600) and never
 
 > **Session keys expire** when you log out of claude.ai. Re-run `setup.sh` to refresh.
 
+## Updating
+
+Terminal update:
+
+```bash
+git pull --ff-only
+bash setup.sh
+```
+
+After one successful `setup.sh` run, the widget also gets an in-settings **Pull & install latest** button in Claude.ai mode. It uses the repo path recorded during setup, so there is no manual repository-path field to maintain.
+
 ## Configuration
 
 Right-click the widget → **Configure**:
@@ -72,6 +84,8 @@ Right-click the widget → **Configure**:
 | Auto-refresh | on | Enable/disable the background refresh timer |
 | Interval | 5 min | Refresh interval (2 min / 5 min / 10 min / 30 min / 1 h / 2 h / 6 h). API mode minimum is 2 minutes. Longer intervals reduce rate-limit exposure. |
 | Project shortcut | — | Name + URL of a Claude project; adds a button to the popup |
+
+The settings page is scrollable, so all options remain reachable on smaller screens, Steam Deck, or higher font scaling.
 
 ### API mode notes
 

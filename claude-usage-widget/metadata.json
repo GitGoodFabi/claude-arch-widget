@@ -14,7 +14,7 @@
         "License": "MIT",
         "Name": "Claude Usage Monitor",
         "Keywords": ["claude", "ai", "usage", "monitor", "anthropic", "api"],
-        "Version": "1.5",
+        "Version": "1.6",
         "Website": "https://github.com/GitGoodFabi/claude-arch-widget"
     },
     "X-Plasma-API-Minimum-Version": "6.0",

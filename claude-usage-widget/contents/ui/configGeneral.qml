@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls as QQC2
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.plasma5support as Plasma5Support
 import org.kde.kirigami as Kirigami
@@ -106,9 +107,72 @@ Item {
         }
     }
 
-    Kirigami.FormLayout {
-        id: configPage
-        anchors { top: parent.top; left: parent.left; right: parent.right; bottom: parent.bottom }
+    Plasma5Support.DataSource {
+        id: updateExec
+        engine: "executable"
+        connectedSources: []
+        onNewData: function(source, data) {
+            disconnectSource(source)
+            var exitCode = Number(data["exit code"])
+            updateButton.running = false
+            updateStatus.isSuccess = !isNaN(exitCode) && exitCode === 0
+            updateStatus.text = updateStatus.isSuccess
+                ? i18n("Updated ✓ - Plasma is restarting")
+                : i18n("Update failed - reinstall once with setup.sh or check git status")
+        }
+    }
+
+    component StyledComboBox: PlasmaComponents.ComboBox {
+        id: control
+        contentItem: Text {
+            leftPadding: 8
+            rightPadding: 8
+            text: control.displayText
+            color: Kirigami.Theme.textColor
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
+        delegate: QQC2.ItemDelegate {
+            width: ListView.view ? ListView.view.width : control.width
+            highlighted: control.highlightedIndex === index
+            contentItem: Text {
+                text: modelData && modelData.label !== undefined ? modelData.label : modelData
+                color: Kirigami.Theme.textColor
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
+            }
+            background: Rectangle {
+                color: parent.highlighted ? Kirigami.Theme.highlightColor : "transparent"
+            }
+        }
+    }
+
+    Flickable {
+        id: settingsScroll
+        anchors { top: parent.top; left: parent.left; right: parent.right; bottom: coffeeImage.top }
+        anchors.bottomMargin: 8
+        clip: true
+        contentWidth: width
+        contentHeight: formContainer.height
+        boundsBehavior: Flickable.StopAtBounds
+        flickableDirection: Flickable.VerticalFlick
+
+        QQC2.ScrollBar.vertical: QQC2.ScrollBar {
+            policy: QQC2.ScrollBar.AsNeeded
+        }
+        QQC2.ScrollBar.horizontal: QQC2.ScrollBar {
+            policy: QQC2.ScrollBar.AlwaysOff
+        }
+
+        Item {
+            id: formContainer
+            width: settingsScroll.width
+            height: configPage.childrenRect.height
+
+            Kirigami.FormLayout {
+                id: configPage
+                width: parent.width
+                height: childrenRect.height
 
     readonly property bool isApiMode: modeCombo.currentValue === "api"
 
@@ -118,7 +182,7 @@ Item {
     }
 
     // ── Widget mode ───────────────────────────────────────────────────────────
-    PlasmaComponents.ComboBox {
+    StyledComboBox {
         id: modeCombo
         Kirigami.FormData.label: i18n("Widget mode:")
         textRole: "label"
@@ -172,7 +236,7 @@ Item {
         PlasmaComponents.ToolTip.visible: hovered
     }
 
-    PlasmaComponents.ComboBox {
+    StyledComboBox {
         id: apiWindowCombo
         visible: configPage.isApiMode
         Kirigami.FormData.label: i18n("Time window:")
@@ -198,7 +262,7 @@ Item {
         text: i18n("Enabled")
     }
 
-    PlasmaComponents.ComboBox {
+    StyledComboBox {
         id: apiCurrencyCombo
         visible: configPage.isApiMode && apiShowCostToggle.checked
         Kirigami.FormData.label: i18n("Currency:")
@@ -230,7 +294,7 @@ Item {
         }
     }
 
-    PlasmaComponents.ComboBox {
+    StyledComboBox {
         id: apiBudgetModeCombo
         visible: configPage.isApiMode
         Kirigami.FormData.label: i18n("Cap countdown:")
@@ -247,7 +311,7 @@ Item {
         }
     }
 
-    PlasmaComponents.ComboBox {
+    StyledComboBox {
         id: apiRingDisplayCombo
         visible: configPage.isApiMode && configPage.isApiMode
         Kirigami.FormData.label: i18n("Ring shows:")
@@ -271,7 +335,7 @@ Item {
         text: i18n("Switch with Plasma light/dark mode")
     }
 
-    PlasmaComponents.ComboBox {
+    StyledComboBox {
         id: themeCombo
         visible: !followPlasmaThemeToggle.checked
         Kirigami.FormData.label: i18n("Color theme:")
@@ -294,7 +358,7 @@ Item {
         }
     }
 
-    PlasmaComponents.ComboBox {
+    StyledComboBox {
         id: lightThemeCombo
         visible: followPlasmaThemeToggle.checked
         Kirigami.FormData.label: i18n("Light mode theme:")
@@ -308,7 +372,7 @@ Item {
         }
     }
 
-    PlasmaComponents.ComboBox {
+    StyledComboBox {
         id: darkThemeCombo
         visible: followPlasmaThemeToggle.checked
         Kirigami.FormData.label: i18n("Dark mode theme:")
@@ -355,7 +419,7 @@ Item {
         text: i18n("Show below rings")
     }
 
-    PlasmaComponents.ComboBox {
+    StyledComboBox {
         id: sidebarViewCombo
         visible: !configPage.isApiMode
         Kirigami.FormData.label: i18n("Sidebar view:")
@@ -407,7 +471,7 @@ Item {
         Kirigami.FormData.label: i18n("Interval:")
         spacing: 6
 
-        PlasmaComponents.ComboBox {
+        StyledComboBox {
             id: intervalCombo
             enabled: timerToggle.checked
             textRole: "label"
@@ -511,6 +575,48 @@ Item {
         placeholderText: i18n("Default: ~/.config/claude-widget/claude_usage.py")
     }
 
+    Row {
+        visible: !configPage.isApiMode
+        Kirigami.FormData.label: i18n("Update widget:")
+        spacing: 8
+
+        PlasmaComponents.Button {
+            id: updateButton
+            property bool running: false
+            text: i18n("Pull & install latest")
+            icon.name: "update-none"
+            enabled: !running
+            PlasmaComponents.ToolTip.text: i18n("Uses the repo path saved by setup.sh")
+            PlasmaComponents.ToolTip.visible: hovered
+            onClicked: {
+                running = true
+                updateStatus.isSuccess = true
+                updateStatus.text = i18n("Pulling...")
+                var dst = Qt.resolvedUrl("../..").toString().replace("file://", "").replace(/'/g, "'\\''")
+                updateExec.connectSource(
+                    "repo=$(cat \"$HOME/.config/claude-widget/repo_path.txt\" 2>/dev/null) && " +
+                    "[ -n \"$repo\" ] && [ -d \"$repo/.git\" ] && [ -d \"$repo/claude-usage-widget\" ] && " +
+                    "git -C \"$repo\" pull --ff-only 2>&1 && " +
+                    "rm -rf '" + dst + "' && " +
+                    "mkdir -p '" + dst + "' && " +
+                    "cp -r \"$repo/claude-usage-widget/.\" '" + dst + "/' && " +
+                    "(kquitapp6 plasmashell; sleep 1; " +
+                    "(kstart6 plasmashell || plasmashell --replace) &>/dev/null) &"
+                )
+            }
+        }
+
+        PlasmaComponents.Label {
+            id: updateStatus
+            property bool isSuccess: true
+            text: ""
+            color: isSuccess ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
+            anchors.verticalCenter: parent.verticalCenter
+            wrapMode: Text.Wrap
+            width: 180
+        }
+    }
+
     // ── Notifications (Claude.ai mode only) ───────────────────────────────────
     PlasmaComponents.CheckBox {
         id: notifyAllToggle
@@ -552,9 +658,12 @@ Item {
     }
 
     } // Kirigami.FormLayout
+    } // Item
+    } // Flickable
 
     // ── Buy me a coffee — anchored to bottom-right of the config window ───────
     Image {
+        id: coffeeImage
         anchors.bottom: parent.bottom
         anchors.left:   parent.left
         anchors.margins: 12

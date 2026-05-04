@@ -5,6 +5,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$HOME/.config/claude-widget"
 SCRIPT_DST="$CONFIG_DIR/claude_usage.py"
+REPO_PATH_FILE="$CONFIG_DIR/repo_path.txt"
 PLASMOID_ID="com.github.fabian.claude-usage"
 PLASMOID_DST="$HOME/.local/share/plasma/plasmoids/$PLASMOID_ID"
 
@@ -51,6 +52,11 @@ step "Installing fetch script..."
 cp "$REPO_DIR/claude_usage.py" "$SCRIPT_DST"
 chmod 755 "$SCRIPT_DST"
 ok "Script installed: $SCRIPT_DST"
+
+step "Recording local repo path..."
+printf '%s\n' "$REPO_DIR" > "$REPO_PATH_FILE"
+chmod 600 "$REPO_PATH_FILE"
+ok "Repo path stored: $REPO_PATH_FILE"
 
 # ── 3. Session key ────────────────────────────────────────────────────────────
 step "Setting up session key..."
@@ -117,6 +123,7 @@ fi
 
 # ── 5. Install widget ─────────────────────────────────────────────────────────
 step "Installing Plasma widget..."
+rm -rf "$PLASMOID_DST"
 mkdir -p "$PLASMOID_DST"
 cp -r "$REPO_DIR/claude-usage-widget/." "$PLASMOID_DST/"
 ok "Widget installed: $PLASMOID_DST"
@@ -133,11 +140,17 @@ ok "Icon installed and cache rebuilt"
 step "Restarting Plasma shell..."
 if kquitapp6 plasmashell 2>/dev/null; then
     sleep 1
-    kstart plasmashell &>/dev/null &
+    if command -v kstart6 &>/dev/null; then
+        kstart6 plasmashell &>/dev/null &
+    elif command -v kstart &>/dev/null; then
+        kstart plasmashell &>/dev/null &
+    else
+        plasmashell --replace &>/dev/null &
+    fi
     ok "Plasma shell restarting in background."
 else
     warn "Could not restart plasmashell automatically."
-    warn "Please log out and back in, or run:  kquitapp6 plasmashell && kstart plasmashell"
+    warn "Please log out and back in, or run:  kquitapp6 plasmashell && kstart6 plasmashell"
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
