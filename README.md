@@ -87,6 +87,30 @@ Right-click the widget → **Configure**:
 
 The settings page is scrollable, so all options remain reachable on smaller screens, Steam Deck, or higher font scaling.
 
+### Choosing the organization (multi-org accounts)
+
+`claude.ai/api/organizations` returns every org your account belongs to, and only the
+chat-capable one serves usage data. If you have a Team seat or an Anthropic Console
+account, the list also contains API-only orgs that have no usage to report.
+
+The widget picks the org automatically: it keeps the ones whose `capabilities` include
+`chat` and prefers the richest plan (`claude_max` → `claude_pro` → `raven`). `setup.sh`
+prints the org it settled on after a successful fetch, so you can check the guess.
+
+To override it, write the org UUID to `~/.config/claude-widget/org_id.txt`:
+
+```bash
+# List your orgs (uses the session key setup.sh already stored)
+curl -s https://claude.ai/api/organizations \
+  -H "Cookie: sessionKey=$(cat ~/.config/claude-widget/session.txt)" \
+  | python3 -m json.tool
+
+# Pin the one you want
+echo 'PASTE-ORG-UUID-HERE' > ~/.config/claude-widget/org_id.txt
+```
+
+The file takes priority over the automatic choice. Delete it to go back to auto-detection.
+
 ### API mode notes
 
 - Requires an Anthropic **organization Admin API key**
