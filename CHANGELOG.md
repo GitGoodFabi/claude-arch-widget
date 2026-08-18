@@ -2,6 +2,15 @@
 
 All notable changes to Claude Usage Monitor are documented here.
 
+## [1.6.1] - 2026-08-19
+
+### Fixed
+- **Multi-organization accounts** (Team plans, or anyone who also has an Anthropic Console org): the widget picked the first organization returned by `/api/organizations`, which is often an API-only Console org with no usage data, so the rings showed an error. It now selects a chat-capable org, preferring `claude_max` → `claude_pro` → `raven`.
+
+### Added
+- `~/.config/claude-widget/org_id.txt` — optional manual override that pins the organization UUID the widget queries
+- `setup.sh` now prints the organization name and UUID it used after a successful test fetch
+
 ## [1.6] - 2026-05-04
 
 ### Added

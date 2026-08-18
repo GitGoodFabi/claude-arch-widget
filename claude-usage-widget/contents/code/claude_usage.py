@@ -9,6 +9,11 @@ from pathlib import Path
 
 ORGS_URL = "https://claude.ai/api/organizations"
 COOKIE_FILE = Path.home() / ".config" / "claude-widget" / "session.txt"
+ORG_ID_FILE = Path.home() / ".config" / "claude-widget" / "org_id.txt"
+
+# Only orgs with "chat" in capabilities serve /usage data; API-only Console orgs
+# return no five_hour block. Among chat orgs, prefer the richest plan.
+PLAN_PREFERENCE = ("claude_max", "claude_pro", "raven")
 
 
 def load_session_key():
@@ -33,6 +38,45 @@ def time_until(iso_str: str) -> str:
     if hours > 0:
         return f"{hours}h {minutes}m"
     return f"{minutes}m"
+
+
+def org_capabilities(org):
+    caps = org.get("capabilities") or []
+    return [c for c in caps if isinstance(c, str)]
+
+
+def plan_score(org):
+    """Ranks a chat org by plan; higher wins, 0 means no known plan capability."""
+    caps = org_capabilities(org)
+    for i, cap in enumerate(PLAN_PREFERENCE):
+        if cap in caps:
+            return len(PLAN_PREFERENCE) - i
+    return 0
+
+
+def pick_org_id(orgs):
+    """Returns the UUID of the org that serves usage data, or None.
+
+    A manual override in org_id.txt always wins. Otherwise the chat-capable orgs
+    are ranked by plan preference — accounts with a Console org get several
+    API-only orgs back, and those have no usage data.
+    """
+    try:
+        override = ORG_ID_FILE.read_text().strip()
+    except OSError:
+        override = ""
+    if override:
+        return override
+
+    chat_orgs = [
+        org for org in orgs
+        if isinstance(org, dict) and "chat" in org_capabilities(org)
+    ]
+    for org in sorted(chat_orgs, key=plan_score, reverse=True):
+        org_id = org.get("uuid") or org.get("id")
+        if org_id:
+            return org_id
+    return None
 
 
 def make_request(url, session_key):
@@ -65,16 +109,23 @@ def main():
         print(json.dumps({"error": str(e), "auth": False}))
         sys.exit(1)
 
-    # Pick first active org
-    org_id = None
-    for org in orgs:
-        org_id = org.get("uuid") or org.get("id")
-        if org_id:
-            break
+    if not isinstance(orgs, list):
+        orgs = []
+
+    org_id = pick_org_id(orgs)
 
     if not org_id:
-        print(json.dumps({"error": "Could not find organization ID"}))
+        print(json.dumps({
+            "error": f"No claude.ai organization found for this account. If you have several orgs, put the right UUID in {ORG_ID_FILE}",
+            "auth": False,
+        }))
         sys.exit(1)
+
+    org_name = next(
+        (org.get("name", "") for org in orgs
+         if isinstance(org, dict) and (org.get("uuid") or org.get("id")) == org_id),
+        "",
+    )
 
     usage_url = f"https://claude.ai/api/organizations/{org_id}/usage"
 
@@ -92,6 +143,10 @@ def main():
     extra = data.get("extra_usage") or {}
 
     output = {
+        "org": {
+            "uuid": org_id,
+            "name": org_name,
+        },
         "session": {
             "utilization": five_hour.get("utilization", 0),
             "resets_in": time_until(five_hour["resets_at"]) if five_hour.get("resets_at") else "?",

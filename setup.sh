@@ -111,6 +111,18 @@ OUTPUT="$(python3 "$SCRIPT_DST" 2>&1)"
 
 if python3 -c "import sys,json; d=json.loads(sys.stdin.read()); exit(0 if 'session' in d else 1)" <<< "$OUTPUT" 2>/dev/null; then
     ok "Data fetch successful!"
+    ORG_INFO="$(python3 -c '
+import json, sys
+org = json.load(sys.stdin).get("org") or {}
+uuid = org.get("uuid")
+if uuid:
+    print("%s  (%s)" % (org.get("name") or "(unnamed)", uuid))
+' <<< "$OUTPUT" 2>/dev/null)" || ORG_INFO=""
+    if [ -n "$ORG_INFO" ]; then
+        ok "Organization: $ORG_INFO"
+        echo -e "    Multiple orgs? If that is the wrong one, put the right UUID in"
+        echo -e "    $CONFIG_DIR/org_id.txt and re-run this script."
+    fi
     echo "$OUTPUT" | python3 -m json.tool 2>/dev/null || echo "$OUTPUT"
 else
     err "Fetch failed."
