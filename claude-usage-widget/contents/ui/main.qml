@@ -105,45 +105,45 @@ PlasmoidItem {
         var map = {
             "amber": {
                 s: "#FF7300",              w: "#FFB347",
-                sT: "rgba(255,115,0,0.18)",  wT: "rgba(255,179,71,0.18)",
-                sDim: "rgba(255,115,0,0.65)",  wDim: "rgba(255,178,71,0.65)",
-                sLbl: "rgba(255,115,0,0.5)"
+                sT: Qt.rgba(255 / 255, 115 / 255, 0 / 255, 0.18),  wT: Qt.rgba(255 / 255, 179 / 255, 71 / 255, 0.18),
+                sDim: Qt.rgba(255 / 255, 115 / 255, 0 / 255, 0.65),  wDim: Qt.rgba(255 / 255, 178 / 255, 71 / 255, 0.65),
+                sLbl: Qt.rgba(255 / 255, 115 / 255, 0 / 255, 0.5)
             },
             "ocean": {
                 s: "#3B9EFF",              w: "#93C5FD",
-                sT: "rgba(59,158,255,0.18)", wT: "rgba(147,197,253,0.18)",
-                sDim: "rgba(59,158,255,0.6)", wDim: "rgba(147,197,253,0.6)",
-                sLbl: "rgba(59,158,255,0.5)"
+                sT: Qt.rgba(59 / 255, 158 / 255, 255 / 255, 0.18), wT: Qt.rgba(147 / 255, 197 / 255, 253 / 255, 0.18),
+                sDim: Qt.rgba(59 / 255, 158 / 255, 255 / 255, 0.6), wDim: Qt.rgba(147 / 255, 197 / 255, 253 / 255, 0.6),
+                sLbl: Qt.rgba(59 / 255, 158 / 255, 255 / 255, 0.5)
             },
             "aurora": {
                 s: "#00D4AA",              w: "#67E8F9",
-                sT: "rgba(0,212,170,0.18)",  wT: "rgba(103,232,249,0.18)",
-                sDim: "rgba(0,212,170,0.6)", wDim: "rgba(103,232,249,0.6)",
-                sLbl: "rgba(0,212,170,0.5)"
+                sT: Qt.rgba(0 / 255, 212 / 255, 170 / 255, 0.18),  wT: Qt.rgba(103 / 255, 232 / 255, 249 / 255, 0.18),
+                sDim: Qt.rgba(0 / 255, 212 / 255, 170 / 255, 0.6), wDim: Qt.rgba(103 / 255, 232 / 255, 249 / 255, 0.6),
+                sLbl: Qt.rgba(0 / 255, 212 / 255, 170 / 255, 0.5)
             },
             "violet": {
                 s: "#A855F7",              w: "#E879F9",
-                sT: "rgba(168,85,247,0.18)", wT: "rgba(232,121,249,0.18)",
-                sDim: "rgba(168,85,247,0.6)",wDim: "rgba(232,121,249,0.6)",
-                sLbl: "rgba(168,85,247,0.5)"
+                sT: Qt.rgba(168 / 255, 85 / 255, 247 / 255, 0.18), wT: Qt.rgba(232 / 255, 121 / 255, 249 / 255, 0.18),
+                sDim: Qt.rgba(168 / 255, 85 / 255, 247 / 255, 0.6),wDim: Qt.rgba(232 / 255, 121 / 255, 249 / 255, 0.6),
+                sLbl: Qt.rgba(168 / 255, 85 / 255, 247 / 255, 0.5)
             },
             "glass": {
-                s: "rgba(210,235,255,0.92)", w: "rgba(255,255,255,0.78)",
-                sT: "rgba(210,235,255,0.13)", wT: "rgba(255,255,255,0.09)",
-                sDim: "rgba(210,235,255,0.55)", wDim: "rgba(255,255,255,0.45)",
-                sLbl: "rgba(210,235,255,0.45)"
+                s: Qt.rgba(210 / 255, 235 / 255, 255 / 255, 0.92), w: Qt.rgba(255 / 255, 255 / 255, 255 / 255, 0.78),
+                sT: Qt.rgba(210 / 255, 235 / 255, 255 / 255, 0.13), wT: Qt.rgba(255 / 255, 255 / 255, 255 / 255, 0.09),
+                sDim: Qt.rgba(210 / 255, 235 / 255, 255 / 255, 0.55), wDim: Qt.rgba(255 / 255, 255 / 255, 255 / 255, 0.45),
+                sLbl: Qt.rgba(210 / 255, 235 / 255, 255 / 255, 0.45)
             },
             "emerald": {
                 s: "#10B981",              w: "#6EE7B7",
-                sT: "rgba(16,185,129,0.18)",  wT: "rgba(110,231,183,0.18)",
-                sDim: "rgba(16,185,129,0.6)", wDim: "rgba(110,231,183,0.6)",
-                sLbl: "rgba(16,185,129,0.5)"
+                sT: Qt.rgba(16 / 255, 185 / 255, 129 / 255, 0.18),  wT: Qt.rgba(110 / 255, 231 / 255, 183 / 255, 0.18),
+                sDim: Qt.rgba(16 / 255, 185 / 255, 129 / 255, 0.6), wDim: Qt.rgba(110 / 255, 231 / 255, 183 / 255, 0.6),
+                sLbl: Qt.rgba(16 / 255, 185 / 255, 129 / 255, 0.5)
             },
             "rose": {
                 s: "#F43F5E",              w: "#FDA4AF",
-                sT: "rgba(244,63,94,0.18)",   wT: "rgba(253,164,175,0.18)",
-                sDim: "rgba(244,63,94,0.6)",  wDim: "rgba(253,164,175,0.6)",
-                sLbl: "rgba(244,63,94,0.5)"
+                sT: Qt.rgba(244 / 255, 63 / 255, 94 / 255, 0.18),   wT: Qt.rgba(253 / 255, 164 / 255, 175 / 255, 0.18),
+                sDim: Qt.rgba(244 / 255, 63 / 255, 94 / 255, 0.6),  wDim: Qt.rgba(253 / 255, 164 / 255, 175 / 255, 0.6),
+                sLbl: Qt.rgba(244 / 255, 63 / 255, 94 / 255, 0.5)
             }
         }
         return map[key] || map["amber"]
@@ -535,14 +535,14 @@ PlasmoidItem {
 
             Text {
                 width: compact.textW
-                text: root.loading ? "…" : root.errorMsg ? "!" : Math.round(root.sessionPct) + "%"
-                color: root.errorMsg ? "#ff5555" : root.theme.s
+                text: root.loading ? "…" : root.errorMsg ? "!" : Math.round(root.weeklyPct >= 100 ? root.weeklyPct : root.sessionPct) + "%"
+                color: root.errorMsg ? "#ff5555" : (root.weeklyPct >= 100 ? root.theme.w : root.theme.s)
                 font.pixelSize: Math.round(compact.h * 0.32)
                 font.bold: true
             }
             Text {
                 width: compact.textW
-                text: root.loading || root.errorMsg ? "" : root.sessionResetsIn
+                text: root.loading || root.errorMsg ? "" : (root.weeklyPct >= 100 ? root.weeklyResetsIn : root.sessionResetsIn)
                 color: Kirigami.Theme.disabledTextColor
                 font.pixelSize: Math.round(compact.h * 0.22)
             }
