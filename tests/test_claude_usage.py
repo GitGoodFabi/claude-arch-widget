@@ -59,3 +59,31 @@ def test_http_401_403_produce_structured_auth_error(load_module, tmp_path, monke
     payload = json.loads(capsys.readouterr().out.strip())
     assert payload["auth"] is True
     assert "401" in payload["error"]
+
+
+@pytest.mark.parametrize("script", [
+    "claude_usage.py",
+    "claude-usage-widget/contents/code/claude_usage.py",
+])
+@pytest.mark.parametrize("seconds,expected", [
+    (-1, "now"),
+    (0, "now"),
+    (59 * 60, "59m"),
+    (23 * 3600 + 59 * 60, "23h 59m"),
+    (24 * 3600, "24h 0m"),
+    (24 * 3600 + 1, "1d 0h"),
+    (25 * 3600 + 30 * 60, "1d 1h"),
+    (48 * 3600, "2d 0h"),
+    (116 * 3600 + 25 * 60, "4d 20h"),
+])
+def test_reset_countdown_day_format(script, seconds, expected, load_module, monkeypatch):
+    module = load_module(script)
+    now = datetime(2026, 10, 25, 12, tzinfo=timezone.utc)
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now
+
+    monkeypatch.setattr(module, "datetime", FixedDatetime)
+    assert module.time_until((now + timedelta(seconds=seconds)).isoformat()) == expected

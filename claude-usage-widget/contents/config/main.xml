@@ -50,6 +50,9 @@
     <entry name="projectShortcutUrl" type="String">
       <default></default>
     </entry>
+    <entry name="panelCompactMode" type="Bool">
+      <default>false</default>
+    </entry>
     <entry name="minimalView" type="Bool">
       <default>false</default>
     </entry>

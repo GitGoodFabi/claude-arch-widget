@@ -76,6 +76,7 @@ Right-click the widget → **Configure**:
 
 | Option | Default | Description |
 |---|---|---|
+| Compact mode (taskbar) | off | Show only the rings in a square taskbar widget; click to open full details |
 | View (Desktop) | off | Minimal ring-only view for desktop; click ring for shortcuts |
 | Sidebar view | Compact | **Compact** (ring + shortcuts), **Full widget** (scales to sidebar width), or **Ring only** |
 | Desktop shortcuts | on | Show quick-link buttons below rings in desktop/popup view |

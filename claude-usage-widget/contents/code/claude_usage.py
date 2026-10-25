@@ -30,6 +30,9 @@ def time_until(iso_str: str) -> str:
         return "now"
     total_minutes = int(delta.total_seconds() // 60)
     hours, minutes = divmod(total_minutes, 60)
+    if delta.total_seconds() > 24 * 60 * 60:
+        days, hours = divmod(hours, 24)
+        return f"{days}d {hours}h"
     if hours > 0:
         return f"{hours}h {minutes}m"
     return f"{minutes}m"

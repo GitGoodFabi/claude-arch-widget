@@ -10,6 +10,7 @@ PlasmoidItem {
     id: root
 
     // ── Claude.ai mode properties ─────────────────────────────────────────────
+    property bool hasClaudeUsageData: false
     property real sessionPct: 0
     property real weeklyPct: 0
     property string sessionResetsIn: "?"
@@ -249,6 +250,7 @@ PlasmoidItem {
             "darkModeTheme": Plasmoid.configuration.darkModeTheme || "violet",
             "customSessionColor": Plasmoid.configuration.customSessionColor || "#FF7300",
             "customWeeklyColor": Plasmoid.configuration.customWeeklyColor || "#FFB347",
+            "panelCompactMode": Plasmoid.configuration.panelCompactMode,
             "widgetOpacity": Plasmoid.configuration.widgetOpacity,
             "backgroundOpacity": Plasmoid.configuration.backgroundOpacity,
             "timerEnabled": Plasmoid.configuration.timerEnabled,
@@ -292,6 +294,8 @@ PlasmoidItem {
         Plasmoid.configuration.darkModeTheme = settings.darkModeTheme || Plasmoid.configuration.darkModeTheme
         Plasmoid.configuration.customSessionColor = settings.customSessionColor || Plasmoid.configuration.customSessionColor
         Plasmoid.configuration.customWeeklyColor = settings.customWeeklyColor || Plasmoid.configuration.customWeeklyColor
+        if (settings.panelCompactMode !== undefined)
+            Plasmoid.configuration.panelCompactMode = settings.panelCompactMode
         if (settings.widgetOpacity !== undefined)
             Plasmoid.configuration.widgetOpacity = settings.widgetOpacity
         if (settings.backgroundOpacity !== undefined)
@@ -367,8 +371,15 @@ PlasmoidItem {
         // h = short side of the panel (height when horizontal, width when vertical)
         readonly property real h:        vertical ? parent.width : parent.height
         readonly property real iconSize: Math.round(h * 0.84)
-        readonly property real textW:    Math.round(h * 1.6)
-        readonly property real totalW:   iconSize + textW + Math.round(h * 0.25)
+        readonly property bool ringsOnly: !vertical && Plasmoid.configuration.panelCompactMode
+        // Fit subscription text to its content; keep the API/sidebar sizing unchanged.
+        readonly property real textW: root.apiMode || vertical
+            ? Math.round(h * 1.6)
+            : Math.ceil(Math.max(panelPercentage.implicitWidth, panelReset.implicitWidth))
+        readonly property real totalW: ringsOnly ? h : root.apiMode || vertical
+            ? iconSize + textW + Math.round(h * 0.25)
+            : Math.round((h - iconSize) / 2) + iconSize + Math.round(h * 0.15)
+              + textW + Math.round(h * 0.08)
 
         Layout.minimumWidth:   vertical ? parent.width : totalW
         Layout.preferredWidth: vertical ? parent.width : totalW
@@ -527,22 +538,24 @@ PlasmoidItem {
 
         // ── Horizontal panel: claudeai mode text ──────────────────────────────
         Column {
-            visible: !compact.vertical && !root.apiMode
+            visible: !compact.vertical && !compact.ringsOnly && !root.apiMode
             anchors.verticalCenter: parent.verticalCenter
             anchors.left:           compactCanvas.right
             anchors.leftMargin:     Math.round(compact.h * 0.15)
             spacing: 0
 
             Text {
+                id: panelPercentage
                 width: compact.textW
-                text: root.loading ? "…" : root.errorMsg ? "!" : Math.round(root.sessionPct) + "%"
+                text: root.loading && !root.hasClaudeUsageData ? "…" : root.errorMsg ? "!" : Math.round(root.sessionPct) + "%"
                 color: root.errorMsg ? "#ff5555" : root.theme.s
                 font.pixelSize: Math.round(compact.h * 0.32)
                 font.bold: true
             }
             Text {
+                id: panelReset
                 width: compact.textW
-                text: root.loading || root.errorMsg ? "" : root.sessionResetsIn
+                text: (root.loading && !root.hasClaudeUsageData) || root.errorMsg ? "" : root.sessionResetsIn
                 color: Kirigami.Theme.disabledTextColor
                 font.pixelSize: Math.round(compact.h * 0.22)
             }
@@ -550,7 +563,7 @@ PlasmoidItem {
 
         // ── Horizontal panel: API mode text ───────────────────────────────────
         Column {
-            visible: !compact.vertical && root.apiMode
+            visible: !compact.vertical && !compact.ringsOnly && root.apiMode
             anchors.verticalCenter: parent.verticalCenter
             anchors.left:           compactCanvas.right
             anchors.leftMargin:     Math.round(compact.h * 0.15)
@@ -1261,6 +1274,7 @@ PlasmoidItem {
                     root.weeklyPct       = j.weekly.utilization
                     root.weeklyResetsIn  = j.weekly.resets_in
                     root.weeklyResetsAt  = j.weekly.resets_at
+                    root.hasClaudeUsageData = true
                     checkNotifications()
                 }
             } catch(e) {
@@ -1494,6 +1508,7 @@ PlasmoidItem {
         function onRefreshIntervalSecondsChanged() { sharedSettingsSaveTimer.restart() }
         function onProjectShortcutLabelChanged() { sharedSettingsSaveTimer.restart() }
         function onProjectShortcutUrlChanged() { sharedSettingsSaveTimer.restart() }
+        function onPanelCompactModeChanged() { sharedSettingsSaveTimer.restart() }
         function onMinimalViewChanged() { sharedSettingsSaveTimer.restart() }
         function onSidebarViewChanged() { sharedSettingsSaveTimer.restart() }
         function onScriptPathChanged() { sharedSettingsSaveTimer.restart() }

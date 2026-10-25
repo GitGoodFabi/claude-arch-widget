@@ -30,6 +30,7 @@ Item {
     property string cfg_customSessionColorDefault: "#FF7300"
     property string cfg_customWeeklyColorDefault: "#FFB347"
     property bool cfg_desktopShortcutsDefault: true
+    property bool cfg_panelCompactModeDefault: false
     property bool cfg_minimalViewDefault: false
     property bool cfg_notifySession25Default: false
     property bool cfg_notifySession50Default: false
@@ -73,6 +74,7 @@ Item {
     property alias cfg_refreshIntervalSeconds: intervalCombo.currentValue
     property alias cfg_projectShortcutLabel:  projectLabelField.text
     property alias cfg_projectShortcutUrl:    projectUrlField.text
+    property alias cfg_panelCompactMode: panelCompactToggle.checked
     property alias cfg_minimalView:           minimalToggle.checked
     property alias cfg_sidebarView:           sidebarViewCombo.currentValue
     property alias cfg_scriptPath:            scriptPathField.text
@@ -402,6 +404,12 @@ Item {
         showAlphaChannel: false
         Component.onCompleted: color = configRoot.cfg_customWeeklyColor
         onColorChanged: configRoot.cfg_customWeeklyColor = color.toString()
+    }
+
+    PlasmaComponents.CheckBox {
+        id: panelCompactToggle
+        Kirigami.FormData.label: i18n("Compact mode (taskbar):")
+        text: i18n("Show only rings")
     }
 
     // ── View (Claude.ai mode only) ────────────────────────────────────────────
